@@ -18,6 +18,6 @@ android {
 }
 
 dependencies {
-    testImplementation(libs.junit.jupiter.api)
-    testRuntimeOnly(libs.junit.jupiter.engine)
+    implementation(project(":core:security"))
+    testImplementation(libs.junit4)
 }

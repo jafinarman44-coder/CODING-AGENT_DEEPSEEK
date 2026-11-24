@@ -3,48 +3,34 @@ package com.lifeeasy.agent.core.designsystem.theme
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-private val LightColors = lightColorScheme(
-    primary = LifeEasyBlue,
-    onPrimary = Color.White,
-    primaryContainer = LifeEasyBlueLight,
-    onPrimaryContainer = LifeEasyNavy,
-    secondary = LifeEasyTeal,
-    onSecondary = Color.White,
-    secondaryContainer = LifeEasyMint,
-    onSecondaryContainer = LifeEasyNavy,
-    background = LifeEasyBackground,
-    onBackground = LifeEasyText,
-    surface = LifeEasySurface,
-    onSurface = LifeEasyText,
-    surfaceVariant = LifeEasyBlueLight,
-    onSurfaceVariant = LifeEasyMuted,
-    outline = LifeEasyBorder,
-    error = LifeEasyError
+private val LifeEasyColors = darkColorScheme(
+    primary = Color(0xFFE53935),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFF3B1010),
+    onPrimaryContainer = Color(0xFFFFDAD6),
+    secondary = Color(0xFFFF6B6B),
+    onSecondary = Color(0xFF2B0808),
+    secondaryContainer = Color(0xFF2A1717),
+    onSecondaryContainer = Color(0xFFFFDAD6),
+    background = Color(0xFF0A0A0A),
+    onBackground = Color(0xFFF5F5F5),
+    surface = Color(0xFF0A0A0A),
+    onSurface = Color(0xFFF5F5F5),
+    surfaceVariant = Color(0xFF242424),
+    onSurfaceVariant = Color(0xFFBDBDBD),
+    outline = Color(0xFF666666),
+    error = Color(0xFFFF6B6B),
+    onError = Color(0xFF2B0808)
 )
 
-private val DarkColors = darkColorScheme(
-    primary = Color(0xFF8CC8FF),
-    onPrimary = Color(0xFF003354),
-    secondary = Color(0xFF77D5D2),
-    background = LifeEasyDarkBackground,
-    onBackground = LifeEasyDarkText,
-    surface = LifeEasyDarkSurface,
-    onSurface = LifeEasyDarkText,
-    onSurfaceVariant = LifeEasyDarkMuted,
-    error = Color(0xFFFFB4AB)
-)
-
+/** Dark high-contrast theme is the app default; callers cannot accidentally fall back to light mode. */
 @Composable
-fun LifeEasyTheme(
-    darkTheme: Boolean = false,
-    content: @Composable () -> Unit
-) {
+fun LifeEasyTheme(content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = if (darkTheme) DarkColors else LightColors,
+        colorScheme = LifeEasyColors,
         typography = LifeEasyTypography,
         content = content
     )
