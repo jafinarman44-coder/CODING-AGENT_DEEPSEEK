@@ -6,6 +6,7 @@ agp = "8.10.1"
 kotlin = "2.0.21"
 composeBom = "2024.12.01"
 room = "2.6.1"
+roomKtx = "2.6.1"
 hilt = "2.52"
 workManager = "2.10.0"
 navigationCompose = "2.8.5"
@@ -32,8 +33,8 @@ androidx-activity-compose = { module = "androidx.activity:activity-compose", ver
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
-androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workManager" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
+androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workManager" }
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
 hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
 hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version = "1.2.0" }

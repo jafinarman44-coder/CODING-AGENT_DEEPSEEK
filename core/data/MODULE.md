@@ -1,6 +1,3 @@
-// LIFEEASY — Copyright (c) 2026 MAHADI HASAN JEWEL
-// Unauthorized use, reproduction, or distribution is prohibited.
+# Core Data
 
-# :core:data
-
-Module scaffold created in STEP 2. Feature implementation is scheduled for its designated build step; this module is not represented as feature-complete.
+Provides Room persistence and DataStore preferences. Personal memories are encrypted with the Android Keystore-backed AES-GCM cipher before being written to Room. The domain repository contract is implemented here; plaintext is only materialized in process memory when a consumer observes memories. Preferences are limited to non-secret presentation settings.
