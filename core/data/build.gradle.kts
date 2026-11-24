@@ -23,7 +23,9 @@ android {
 ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 
 dependencies {
-    implementation(libs.androidx.room.runtime)
+    // RoomDatabase is a public supertype of LifeEasyDatabase, which is exposed to :app.
+    // Use api so downstream modules can resolve that public type on their compile classpath.
+    api(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.datastore.preferences)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
