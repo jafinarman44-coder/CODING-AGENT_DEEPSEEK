@@ -1,6 +1,3 @@
-// LIFEEASY — Copyright (c) 2026 MAHADI HASAN JEWEL
-// Unauthorized use, reproduction, or distribution is prohibited.
-
 # :feature:monitor
 
-Module scaffold created in STEP 2. Feature implementation is scheduled for its designated build step; this module is not represented as feature-complete.
+STEP 12 implementation: bounded, observable in-memory event store for local agent executions. The app's Monitor screen combines these events with live Android runtime metrics (available RAM, app heap, battery level, OS/API and app version). This is not a persistent crash analytics service or a remote telemetry backend.

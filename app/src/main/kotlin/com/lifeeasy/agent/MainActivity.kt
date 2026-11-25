@@ -2,6 +2,10 @@
 package com.lifeeasy.agent
 
 import android.os.Bundle
+import android.app.ActivityManager
+import android.content.Context
+import android.os.BatteryManager
+import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Canvas
@@ -9,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -23,13 +28,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lifeeasy.agent.core.data.local.DatabaseFactory
@@ -38,6 +40,7 @@ import com.lifeeasy.agent.core.designsystem.theme.LifeEasyTheme
 import com.lifeeasy.agent.feature.agent.DefaultAgentRuntime
 import com.lifeeasy.agent.feature.agent.model.AgentRequest
 import com.lifeeasy.agent.feature.memory.MemoryScreen
+import com.lifeeasy.agent.feature.monitor.MonitorEventStore
 import io.github.sceneview.Scene
 import io.github.sceneview.math.Position
 import io.github.sceneview.node.ModelNode
@@ -173,7 +176,7 @@ private fun HomeScreen(onSelect: (Destination) -> Unit) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
             Box(Modifier.fillMaxWidth().height(252.dp)) {
-                EarthGlobeScene(Modifier.align(Alignment.CenterStart).fillMaxWidth(.70f).height(245.dp))
+                EarthGlobeScene(Modifier.align(Alignment.CenterStart).fillMaxWidth(.54f).height(220.dp), modelScale = 1.35f, cameraDistance = 3.25f)
                 Column(Modifier.align(Alignment.CenterEnd).width(135.dp).padding(end = 2.dp)) {
                     Text("Hello,", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Light)
                     Text("Welcome", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold, lineHeight = 29.sp)
@@ -215,66 +218,39 @@ private fun HomeScreen(onSelect: (Destination) -> Unit) {
  * The model is bundled locally; no network request is needed at runtime.
  */
 @Composable
-private fun EarthGlobeScene(modifier: Modifier = Modifier) {
+private fun EarthGlobeScene(modifier: Modifier = Modifier, modelScale: Float = 1.2f, cameraDistance: Float = 3.0f) {
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
     val cameraNode = rememberCameraNode(engine) {
-        position = Position(z = 3.2f)
+        position = Position(z = cameraDistance)
     }
     val mainLightNode = rememberMainLightNode(engine) {
-        intensity = 95_000.0f
+        intensity = 110_000.0f
     }
-    // SceneView 2.3.0 is aligned with this project's Kotlin 2.0.21 / JVM 17 toolchain.
-    // Keep the load failure explicit rather than silently substituting a fake globe.
-    val modelInstance = remember(modelLoader) {
-        runCatching {
-            modelLoader.createModelInstance("models/earth_globe_sci-fi_look.glb")
-        }.getOrNull()
+    val modelLoadResult = remember(modelLoader) {
+        runCatching { modelLoader.createModelInstance("models/earth_globe_sci-fi_look.glb") }
+    }
+    val modelInstance = modelLoadResult.getOrNull()
+    val globeNodes = rememberNodes {
+        modelInstance?.let { instance ->
+            add(ModelNode(modelInstance = instance, scaleToUnits = modelScale, autoAnimate = true))
+        }
     }
 
-    if (modelInstance == null) {
-        Box(modifier, contentAlignment = Alignment.Center) {
-            Text("3D globe could not be loaded", color = Muted, fontSize = 10.sp)
-        }
-    } else {
-        val globeNodes = rememberNodes {
-            add(
-                ModelNode(
-                    modelInstance = modelInstance,
-                    scaleToUnits = 1.55f,
-                    autoAnimate = true
-                )
+    Box(modifier = modifier.background(Color.Transparent), contentAlignment = Alignment.Center) {
+        if (modelInstance != null && globeNodes.isNotEmpty()) {
+            Scene(
+                modifier = Modifier.fillMaxSize(),
+                engine = engine,
+                modelLoader = modelLoader,
+                cameraNode = cameraNode,
+                mainLightNode = mainLightNode,
+                childNodes = globeNodes,
+                isOpaque = false
             )
-        }
-
-        Scene(
-            modifier = modifier,
-            engine = engine,
-            modelLoader = modelLoader,
-            cameraNode = cameraNode,
-            mainLightNode = mainLightNode,
-            childNodes = globeNodes
-        )
-    }
-}
-
-@Composable
-private fun HologramOrb(modifier: Modifier = Modifier) {
-    Canvas(modifier) {
-        val c = Offset(size.width * .48f, size.height * .46f)
-        val r = size.minDimension * .34f
-        drawCircle(Brush.radialGradient(listOf(Cyan.copy(.32f), Violet.copy(.18f), Color.Transparent), c, r * 1.55f), r * 1.55f, c)
-        drawCircle(Brush.radialGradient(listOf(Color(0xFF182B70), Color(0xFF0A0D26), Color(0xFF030611)), c - Offset(r * .18f, r * .18f), r), r, c)
-        drawCircle(Brush.sweepGradient(listOf(Violet, Cyan, Color(0xFF3549B9), Violet, Cyan)), r, c, style = Stroke(width = 3.dp.toPx()))
-        drawOval(Brush.linearGradient(listOf(Violet.copy(.9f), Cyan.copy(.85f), Color.White.copy(.8f))),
-            topLeft = Offset(c.x - r * .96f, c.y - r * .28f), size = Size(r * 1.92f, r * .48f), style = Stroke(width = 5.dp.toPx()))
-        drawOval(Color.White.copy(.55f), topLeft = Offset(c.x - r * 1.25f, c.y + r * 1.12f), size = Size(r * 2.5f, r * .28f), style = Stroke(width = 2.dp.toPx()))
-        drawCircle(Color.White.copy(.9f), 3.dp.toPx(), Offset(c.x, c.y + r * 1.18f))
-        repeat(3) { i ->
-            val angle = Math.toRadians((i * 120.0) - 20.0)
-            val p = Offset(c.x + kotlin.math.cos(angle).toFloat() * r * 1.35f, c.y + kotlin.math.sin(angle).toFloat() * r * .78f)
-            drawCircle(if (i % 2 == 0) Violet else Cyan, 5.dp.toPx(), p)
-            drawCircle(Color.White.copy(.6f), 1.5.dp.toPx(), p)
+        } else {
+            val reason = modelLoadResult.exceptionOrNull()?.message?.take(90) ?: "Unknown GLB loading error"
+            Text("3D Earth unavailable: $reason", color = Muted, fontSize = 9.sp)
         }
     }
 }
@@ -310,6 +286,7 @@ private fun WorkspaceRow(icon: androidx.compose.ui.graphics.vector.ImageVector, 
 
 private data class ChatMessage(val text: String, val fromUser: Boolean, val note: String? = null)
 
+
 @Composable
 private fun ChatScreen() {
     val scope = rememberCoroutineScope()
@@ -325,7 +302,7 @@ private fun ChatScreen() {
         if (messages.isEmpty()) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    HologramOrb(Modifier.size(170.dp))
+                    EarthGlobeScene(Modifier.size(170.dp), modelScale = 1.0f, cameraDistance = 2.8f)
                     Text("What would you like to work on?", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                     Text("Try a summary, meeting notes, task list or document outline.", color = Muted, fontSize = 11.sp)
                 }
@@ -351,8 +328,15 @@ private fun ChatScreen() {
             IconButton(enabled = input.isNotBlank() && !busy, onClick = {
                 val prompt = input.trim(); input = ""; messages += ChatMessage(prompt, true); busy = true
                 scope.launch {
-                    val result = withContext(Dispatchers.Default) { orchestrator.run(AgentRequest(UUID.randomUUID().toString(), prompt)) }
-                    messages += ChatMessage(result.outputText ?: result.message, false, "${result.intent} · ${result.status} · deterministic local workflow")
+                    runCatching {
+                        withContext(Dispatchers.Default) { orchestrator.run(AgentRequest(UUID.randomUUID().toString(), prompt)) }
+                    }.onSuccess { result ->
+                        messages += ChatMessage(result.outputText ?: result.message, false, "${result.intent} · ${result.status} · deterministic local workflow")
+                        MonitorEventStore.record("Agent request completed", "${result.intent} · ${result.status}", true)
+                    }.onFailure { error ->
+                        messages += ChatMessage("The local workflow failed: ${error.message ?: error.javaClass.simpleName}", false)
+                        MonitorEventStore.record("Agent request failed", error.message ?: error.javaClass.simpleName, false)
+                    }
                     busy = false
                 }
             }) { Icon(Icons.Outlined.ArrowUpward, null, tint = if (input.isNotBlank() && !busy) Cyan else Muted) }
@@ -420,15 +404,46 @@ private fun VoiceScreen() {
 
 @Composable
 private fun MonitorScreen() {
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("System Monitor", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Text("Visible module status based on this build's connected components.", color = Muted, fontSize = 11.sp)
-        StatusLine("Encrypted memory", "Connected", true)
-        StatusLine("Offline workflow engine", "Connected", true)
-        StatusLine("Document builders", "Code present · UI not connected", false)
-        StatusLine("Cloud LLM provider", "Not configured", false)
-        StatusLine("Voice / speech provider", "Not configured", false)
-        StatusLine("Web search / image generation", "Not configured", false)
+    val context = LocalContext.current
+    var refresh by remember { mutableIntStateOf(0) }
+    val activityManager = remember(context) { context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager }
+    val memoryInfo = remember(refresh) { ActivityManager.MemoryInfo().also(activityManager::getMemoryInfo) }
+    val runtime = Runtime.getRuntime()
+    val batteryManager = remember(context) { context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager }
+    val battery = remember(refresh) { batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY).takeIf { it in 0..100 } }
+    val usedHeapMb = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
+    val maxHeapMb = runtime.maxMemory() / (1024 * 1024)
+    val availableRamMb = memoryInfo.availMem / (1024 * 1024)
+    val totalRamMb = memoryInfo.totalMem / (1024 * 1024)
+    val appVersion = remember(context) {
+        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "unknown"
+    }
+    val events by MonitorEventStore.events.collectAsState()
+
+    Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("System Monitor", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text("Live values from this Android device and recent agent runs", color = Muted, fontSize = 10.sp)
+            }
+            TextButton(onClick = { refresh++ }) { Icon(Icons.Outlined.Refresh, null, tint = Cyan); Text("Refresh", color = Cyan) }
+        }
+        StatusLine("Application", "LIFEEASY $appVersion · Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})", true)
+        StatusLine("Device RAM available", "$availableRamMb MB / $totalRamMb MB", availableRamMb > 256)
+        StatusLine("App heap", "$usedHeapMb MB used / $maxHeapMb MB max", usedHeapMb < maxHeapMb * 0.9)
+        StatusLine("Battery", battery?.let { "$it%" } ?: "Unavailable on this device", (battery ?: 0) > 10)
+        StatusLine("Encrypted memory", "Repository connected", true)
+        StatusLine("Offline workflow engine", "Connected · ${events.size} recent run(s)", true)
+        StatusLine("Document export UI", "Not connected to editable export workflow", false)
+        StatusLine("Cloud LLM / Voice / Web search", "Not configured in this build", false)
+        Text("RECENT AGENT ACTIVITY", color = Muted, fontSize = 10.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Bold)
+        if (events.isEmpty()) {
+            StatusNote("No agent runs recorded", "Send a message from Chat. Successes and runtime failures will appear here.")
+        } else {
+            events.forEach { event ->
+                StatusLine(event.title, "${event.detail} · ${java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(event.timestamp))}", event.success)
+            }
+        }
     }
 }
 
