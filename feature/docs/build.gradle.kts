@@ -1,5 +1,4 @@
-// LIFEEASY — Copyright (c) 2026 MAHADI HASAN JEWEL
-// Unauthorized use, reproduction, or distribution is prohibited.
+// LIFEEASY — Copyright (c) 2026 MAHADI HASAN JEWEL.
 
 plugins {
     alias(libs.plugins.android.library)
@@ -18,6 +17,5 @@ android {
 }
 
 dependencies {
-    testImplementation(libs.junit.jupiter.api)
-    testRuntimeOnly(libs.junit.jupiter.engine)
+    testImplementation(libs.junit4)
 }

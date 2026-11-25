@@ -22,6 +22,7 @@ Production-oriented Android application foundation.
 - STEP 6 follow-up: Room runtime API visibility fix for downstream compile classpath
 - STEP 7: voice security foundation (`EagleEnrollment`, `SecretCodeManager`, `VoiceGuard`)
 - STEP 8: deterministic agent orchestration core (`AgentOrchestrator`, `PlannerNode`, `SupervisorAgent`, `WatchdogAgent`, typed task nodes)
+- STEP 9: local document exports (`PdfBuilder`, `DocxBuilder`, `PptxBuilder`, `XlsxBuilder`) and Android Print Framework gate (`PrintCommand`)
 - UI correction: default dark high-contrast palette with near-black surfaces, white primary text, muted secondary text, and red brand accent
 
 ## Explicitly not claimed complete
@@ -32,3 +33,6 @@ See `STEP-7-VOICE-SECURITY-REPORT.md` for the exact implementation boundary and 
 
 
 See `STEP-8-AGENT-CORE-REPORT.md` for the exact agent implementation, test evidence, and capability boundaries. The STEP 8 agent core uses deterministic offline routing and text rules; no LLM provider is connected yet.
+
+
+See `STEP-9-DOCS-REPORT.md` for export formats, test evidence, and the Android-runtime verification boundary. DOCX/PPTX/XLSX use direct OOXML package generation; PDF and printing require Android runtime.
