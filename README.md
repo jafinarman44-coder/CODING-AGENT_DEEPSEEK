@@ -21,10 +21,14 @@ Production-oriented Android application foundation.
 - STEP 6: encrypted local memory foundation
 - STEP 6 follow-up: Room runtime API visibility fix for downstream compile classpath
 - STEP 7: voice security foundation (`EagleEnrollment`, `SecretCodeManager`, `VoiceGuard`)
+- STEP 8: deterministic agent orchestration core (`AgentOrchestrator`, `PlannerNode`, `SupervisorAgent`, `WatchdogAgent`, typed task nodes)
 - UI correction: default dark high-contrast palette with near-black surfaces, white primary text, muted secondary text, and red brand accent
 
 ## Explicitly not claimed complete
 
-This archive does not yet include real microphone capture, an offline speaker-embedding model, or a production speaker matcher. The voice authorization gate fails closed and does not ship a fake voice matcher. The app's current launcher screen remains the encrypted-memory screen; full agent, documents, chat, monitoring, settings, and voice interaction screens remain future implementation stages.
+This archive does not yet include real microphone capture, an offline speaker-embedding model, or a production speaker matcher. The voice authorization gate fails closed and does not ship a fake voice matcher. The app's current launcher screen remains the encrypted-memory screen; agent UI wiring, documents, chat, monitoring, settings, and voice interaction screens remain future implementation stages.
 
 See `STEP-7-VOICE-SECURITY-REPORT.md` for the exact implementation boundary and validation record.
+
+
+See `STEP-8-AGENT-CORE-REPORT.md` for the exact agent implementation, test evidence, and capability boundaries. The STEP 8 agent core uses deterministic offline routing and text rules; no LLM provider is connected yet.
