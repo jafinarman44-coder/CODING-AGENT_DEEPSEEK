@@ -43,7 +43,6 @@ import com.lifeeasy.agent.feature.agent.model.AgentRequest
 import com.lifeeasy.agent.feature.memory.MemoryScreen
 import com.lifeeasy.agent.feature.monitor.MonitorEventStore
 import io.github.sceneview.Scene
-import io.github.sceneview.SurfaceType
 import io.github.sceneview.math.Position
 import io.github.sceneview.node.ModelNode
 import io.github.sceneview.rememberCameraNode
@@ -249,7 +248,6 @@ private fun EarthGlobeScene(modifier: Modifier = Modifier, modelScale: Float = 1
         if (modelInstance != null && globeNodes.isNotEmpty()) {
             Scene(
                 modifier = Modifier.fillMaxSize(),
-                surfaceType = SurfaceType.TextureSurface,
                 engine = engine,
                 modelLoader = modelLoader,
                 environmentLoader = environmentLoader,
@@ -257,7 +255,8 @@ private fun EarthGlobeScene(modifier: Modifier = Modifier, modelScale: Float = 1
                 cameraNode = cameraNode,
                 mainLightNode = mainLightNode,
                 childNodes = globeNodes,
-                isOpaque = false
+                isOpaque = false,
+                manipulator = null
             )
         } else {
             val reason = modelLoadResult.exceptionOrNull()?.message?.take(90) ?: "GLB is loading or failed to load"
