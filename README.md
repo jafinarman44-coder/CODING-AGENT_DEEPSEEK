@@ -1,43 +1,35 @@
-// LIFEEASY — Copyright (c) 2026 MAHADI HASAN JEWEL
-// Unauthorized use, reproduction, or distribution is prohibited.
-
 # LIFEEASY
 
-Production-oriented Android application foundation.
+Android application foundation for the LIFEEASY AI companion.
 
 - Package: `com.lifeeasy.agent`
 - Minimum SDK: 26
 - Compile/Target SDK: 36
 - Kotlin: 2.0.21
-- Architecture: Clean Architecture with MVI presentation direction
-- Modules: app, core, and feature modules
+- Android Gradle Plugin: 8.10.1
+- JVM target: 17
+- UI: Jetpack Compose / Material 3
+- 3D rendering: SceneView 2.3.0 / Filament
 
-## Completed implementation stages in this source archive
+## Implemented project areas
 
 - STEP 1–2: project and module scaffolding
 - STEP 3: shared Compose design system
-- STEP 4: security core and security unit tests
-- STEP 5: Room/DataStore data layer
-- STEP 6: encrypted local memory foundation
-- STEP 6 follow-up: Room runtime API visibility fix for downstream compile classpath
-- STEP 7: voice security foundation (`EagleEnrollment`, `SecretCodeManager`, `VoiceGuard`)
-- STEP 8: deterministic agent orchestration core (`AgentOrchestrator`, `PlannerNode`, `SupervisorAgent`, `WatchdogAgent`, typed task nodes)
-- STEP 9: local document exports (`PdfBuilder`, `DocxBuilder`, `PptxBuilder`, `XlsxBuilder`) and Android Print Framework gate (`PrintCommand`)
-- UI correction: default dark high-contrast palette with near-black surfaces, white primary text, muted secondary text, and red brand accent
+- STEP 4: security core
+- STEP 5–6: Room/DataStore data layer and encrypted local memory foundation
+- STEP 7: voice security foundation (not a complete live voice assistant)
+- STEP 8: deterministic offline agent orchestration core (not an LLM)
+- STEP 9: PDF/DOCX/PPTX/XLSX builder code and Android Print Framework gate (UI export workflow still pending)
+- STEP 10: holographic UI/navigation integration
+- STEP 11: user-supplied GLB asset integration (initial device rendering failed; repaired in STEP 12)
+- STEP 12: transparent GLB rendering configuration, shared Home/Chat GLB component, and Monitor module foundation
 
-## Explicitly not claimed complete
+## Explicit capability boundaries
 
-This archive does not yet include real microphone capture, an offline speaker-embedding model, or a production speaker matcher. The voice authorization gate fails closed and does not ship a fake voice matcher. The app's current launcher screen remains the encrypted-memory screen; agent UI wiring, documents, chat, monitoring, settings, and voice interaction screens remain future implementation stages.
+- The local agent uses deterministic workflow logic; no cloud LLM is connected.
+- Microphone capture, speech recognition, ElevenLabs output, web search, and image generation are not active.
+- Document builders exist, but the editable document UI/export workflow is not fully connected.
+- Monitor data is local and in-memory; it is not remote telemetry or persistent crash analytics.
+- Device-level GLB rendering and animation still require validation on a physical Android device after the next GitHub Actions build.
 
-See `STEP-7-VOICE-SECURITY-REPORT.md` for the exact implementation boundary and validation record.
-
-
-See `STEP-8-AGENT-CORE-REPORT.md` for the exact agent implementation, test evidence, and capability boundaries. The STEP 8 agent core uses deterministic offline routing and text rules; no LLM provider is connected yet.
-
-
-See `STEP-9-DOCS-REPORT.md` for export formats, test evidence, and the Android-runtime verification boundary. DOCX/PPTX/XLSX use direct OOXML package generation; PDF and printing require Android runtime.
-
-
-## STEP 11 — User GLB Earth model
-
-The Home hero panel now uses the user-supplied animated GLB model through SceneView 2.3.0/Filament. The exact model file is bundled under `app/src/main/assets/models/`. See `STEP-11-GLB-EARTH-INTEGRATION-REPORT.md` and `THIRD-PARTY-ASSETS.md` for implementation details, validation limits, and attribution.
+See the STEP-specific reports for exact scope and verification limits.
