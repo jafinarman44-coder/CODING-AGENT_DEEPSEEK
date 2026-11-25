@@ -478,10 +478,14 @@ private fun CreateScreen() {
                         ExportFormat.POWERPOINT -> PptxBuilder().build(request, destination)
                         ExportFormat.EXCEL -> XlsxBuilder().build(request, destination)
                     }
-                    if (!buildResult.success || buildResult.file?.isFile != true || buildResult.file.length() <= 0L) {
+                    // Capture the nullable cross-module property once. Kotlin cannot
+                    // smart-cast a public API property declared in another module.
+                    val generatedFile = buildResult.file
+                        ?: error(buildResult.error ?: "Builder did not produce a file")
+                    if (!buildResult.success || !generatedFile.isFile || generatedFile.length() <= 0L) {
                         error(buildResult.error ?: "Builder did not produce a valid file")
                     }
-                    buildResult.file
+                    generatedFile
                 }
             }
             result.onSuccess { file ->
