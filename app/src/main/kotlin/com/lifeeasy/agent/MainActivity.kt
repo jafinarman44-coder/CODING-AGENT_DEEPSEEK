@@ -38,6 +38,14 @@ import com.lifeeasy.agent.core.designsystem.theme.LifeEasyTheme
 import com.lifeeasy.agent.feature.agent.DefaultAgentRuntime
 import com.lifeeasy.agent.feature.agent.model.AgentRequest
 import com.lifeeasy.agent.feature.memory.MemoryScreen
+import io.github.sceneview.Scene
+import io.github.sceneview.math.Position
+import io.github.sceneview.node.ModelNode
+import io.github.sceneview.rememberCameraNode
+import io.github.sceneview.rememberEngine
+import io.github.sceneview.rememberMainLightNode
+import io.github.sceneview.rememberModelLoader
+import io.github.sceneview.rememberNodes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -165,7 +173,7 @@ private fun HomeScreen(onSelect: (Destination) -> Unit) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
             Box(Modifier.fillMaxWidth().height(252.dp)) {
-                HologramOrb(Modifier.align(Alignment.CenterStart).fillMaxWidth(.74f).height(245.dp))
+                EarthGlobeScene(Modifier.align(Alignment.CenterStart).fillMaxWidth(.70f).height(245.dp))
                 Column(Modifier.align(Alignment.CenterEnd).width(135.dp).padding(end = 2.dp)) {
                     Text("Hello,", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Light)
                     Text("Welcome", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold, lineHeight = 29.sp)
@@ -199,6 +207,54 @@ private fun HomeScreen(onSelect: (Destination) -> Unit) {
             }
         }
         item { StatusNote("Offline workflow engine", "No cloud LLM is connected in this build. Supported local text workflows are available in Chat.") }
+    }
+}
+
+/**
+ * Renders the user's supplied animated GLB with Filament/SceneView.
+ * The model is bundled locally; no network request is needed at runtime.
+ */
+@Composable
+private fun EarthGlobeScene(modifier: Modifier = Modifier) {
+    val engine = rememberEngine()
+    val modelLoader = rememberModelLoader(engine)
+    val cameraNode = rememberCameraNode(engine) {
+        position = Position(z = 3.2f)
+    }
+    val mainLightNode = rememberMainLightNode(engine) {
+        intensity = 95_000.0f
+    }
+    // SceneView 2.3.0 is aligned with this project's Kotlin 2.0.21 / JVM 17 toolchain.
+    // Keep the load failure explicit rather than silently substituting a fake globe.
+    val modelInstance = remember(modelLoader) {
+        runCatching {
+            modelLoader.createModelInstance("models/earth_globe_sci-fi_look.glb")
+        }.getOrNull()
+    }
+
+    if (modelInstance == null) {
+        Box(modifier, contentAlignment = Alignment.Center) {
+            Text("3D globe could not be loaded", color = Muted, fontSize = 10.sp)
+        }
+    } else {
+        val globeNodes = rememberNodes {
+            add(
+                ModelNode(
+                    modelInstance = modelInstance,
+                    scaleToUnits = 1.55f,
+                    autoAnimate = true
+                )
+            )
+        }
+
+        Scene(
+            modifier = modifier,
+            engine = engine,
+            modelLoader = modelLoader,
+            cameraNode = cameraNode,
+            mainLightNode = mainLightNode,
+            childNodes = globeNodes
+        )
     }
 }
 

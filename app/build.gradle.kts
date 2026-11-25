@@ -29,6 +29,8 @@ android {
 }
 
 dependencies {
+    // SceneView 2.3.0 matches this project's Kotlin 2.0.21 / JVM 17 toolchain.
+    implementation("io.github.sceneview:sceneview:2.3.0")
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.activity.compose)
