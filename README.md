@@ -33,3 +33,13 @@ Android application foundation for the LIFEEASY AI companion.
 - Device-level GLB rendering and animation still require validation on a physical Android device after the next GitHub Actions build.
 
 See the STEP-specific reports for exact scope and verification limits.
+
+## STEP 13 — GLB rendering and AI provider setup
+
+This build adds a real OpenAI-compatible chat endpoint. Configure it from **Settings → AI Provider**.
+
+- Cloud endpoint: use an HTTPS base URL such as `https://api.openai.com/v1`, enter a model ID supported by your provider, and provide its API key.
+- Local Ollama on a PC on the same Wi-Fi: use `http://<PC-LAN-IP>:11434/v1`, enter the installed Ollama model name (for example `llama3.1`), and leave API key blank. Ollama must listen on `0.0.0.0:11434`; allow inbound TCP 11434 in Windows Firewall for the private LAN. `localhost` on the phone is not the PC.
+- API keys are encrypted at rest with Android Keystore AES-GCM. Remote HTTP endpoints are rejected; HTTP is restricted in app validation to local/private hosts.
+
+The supplied GLB is rendered using SceneView's TextureSurface + transparent render target and an explicit environment for its PBR materials. Device rendering and animation still require handset verification after installing the new APK.

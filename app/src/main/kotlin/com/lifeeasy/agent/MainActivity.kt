@@ -31,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,10 +43,13 @@ import com.lifeeasy.agent.feature.agent.model.AgentRequest
 import com.lifeeasy.agent.feature.memory.MemoryScreen
 import com.lifeeasy.agent.feature.monitor.MonitorEventStore
 import io.github.sceneview.Scene
+import io.github.sceneview.SurfaceType
 import io.github.sceneview.math.Position
 import io.github.sceneview.node.ModelNode
 import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
+import io.github.sceneview.rememberEnvironment
+import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberMainLightNode
 import io.github.sceneview.rememberModelLoader
 import io.github.sceneview.rememberNodes
@@ -83,6 +87,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun LifeEasyShell(memoryRepository: EncryptedMemoryRepository) {
     var selected by remember { mutableStateOf(Destination.HOME) }
+    val context = LocalContext.current
+    val providerStore = remember(context) { AiProviderStore(context) }
     Box(Modifier.fillMaxSize().background(Ink)) {
         StarField(Modifier.fillMaxSize())
         Row(Modifier.fillMaxSize()) {
@@ -91,14 +97,14 @@ private fun LifeEasyShell(memoryRepository: EncryptedMemoryRepository) {
                 TopBar(onSettings = { selected = Destination.SETTINGS }, onSearch = { selected = Destination.EXPLORE })
                 when (selected) {
                     Destination.HOME -> HomeScreen(onSelect = { selected = it })
-                    Destination.CHAT -> ChatScreen()
+                    Destination.CHAT -> ChatScreen(providerStore)
                     Destination.EXPLORE -> ExploreScreen(onSelect = { selected = it })
                     Destination.LIBRARY -> LibraryScreen(onCreate = { selected = Destination.CREATE })
                     Destination.CREATE -> CreateScreen()
                     Destination.VOICE -> VoiceScreen()
                     Destination.MEMORY -> MemoryScreen(repository = memoryRepository)
                     Destination.MONITOR -> MonitorScreen()
-                    Destination.SETTINGS -> SettingsScreen()
+                    Destination.SETTINGS -> SettingsScreen(providerStore)
                 }
             }
         }
@@ -221,12 +227,15 @@ private fun HomeScreen(onSelect: (Destination) -> Unit) {
 private fun EarthGlobeScene(modifier: Modifier = Modifier, modelScale: Float = 1.2f, cameraDistance: Float = 3.0f) {
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
+    val environmentLoader = rememberEnvironmentLoader(engine)
+    // IBL is required for the supplied PBR materials; TextureSurface is required to composite
+    // the 3D viewport inline with Compose instead of punching a black SurfaceView hole.
+    val environment = rememberEnvironment(environmentLoader, isOpaque = false)
     val cameraNode = rememberCameraNode(engine) {
         position = Position(z = cameraDistance)
+        lookAt(Position(0f, 0f, 0f))
     }
-    val mainLightNode = rememberMainLightNode(engine) {
-        intensity = 110_000.0f
-    }
+    val mainLightNode = rememberMainLightNode(engine) { intensity = 55_000.0f }
     val modelLoadResult = remember(modelLoader) {
         runCatching { modelLoader.createModelInstance("models/earth_globe_sci-fi_look.glb") }
     }
@@ -236,20 +245,22 @@ private fun EarthGlobeScene(modifier: Modifier = Modifier, modelScale: Float = 1
             add(ModelNode(modelInstance = instance, scaleToUnits = modelScale, autoAnimate = true))
         }
     }
-
     Box(modifier = modifier.background(Color.Transparent), contentAlignment = Alignment.Center) {
         if (modelInstance != null && globeNodes.isNotEmpty()) {
             Scene(
                 modifier = Modifier.fillMaxSize(),
+                surfaceType = SurfaceType.TextureSurface,
                 engine = engine,
                 modelLoader = modelLoader,
+                environmentLoader = environmentLoader,
+                environment = environment,
                 cameraNode = cameraNode,
                 mainLightNode = mainLightNode,
                 childNodes = globeNodes,
                 isOpaque = false
             )
         } else {
-            val reason = modelLoadResult.exceptionOrNull()?.message?.take(90) ?: "Unknown GLB loading error"
+            val reason = modelLoadResult.exceptionOrNull()?.message?.take(90) ?: "GLB is loading or failed to load"
             Text("3D Earth unavailable: $reason", color = Muted, fontSize = 9.sp)
         }
     }
@@ -288,16 +299,18 @@ private data class ChatMessage(val text: String, val fromUser: Boolean, val note
 
 
 @Composable
-private fun ChatScreen() {
+private fun ChatScreen(providerStore: AiProviderStore) {
     val scope = rememberCoroutineScope()
+    val providerClient = remember { OpenAiCompatibleClient() }
+    var providerConfig by remember { mutableStateOf(providerStore.load()) }
     val orchestrator = remember { DefaultAgentRuntime.createOrchestrator() }
     var input by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     val messages = remember { mutableStateListOf<ChatMessage>() }
     Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) { Text("AI Conversation", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold); Text("Local workflow mode · no cloud model", color = Muted, fontSize = 10.sp) }
-            Surface(color = Color(0xFF142B34), shape = CircleShape) { Text("● LOCAL", color = Cyan, fontSize = 9.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) }
+            Column(Modifier.weight(1f)) { Text("AI Conversation", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold); Text(if (providerConfig.isConfigured) "${providerConfig.providerName} · ${providerConfig.model}" else "No language model connected · configure in Settings", color = Muted, fontSize = 10.sp) }
+            Surface(color = Color(0xFF142B34), shape = CircleShape) { Text(if (providerConfig.isConfigured) "● AI READY" else "● OFFLINE", color = Cyan, fontSize = 9.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) }
         }
         if (messages.isEmpty()) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -329,13 +342,25 @@ private fun ChatScreen() {
                 val prompt = input.trim(); input = ""; messages += ChatMessage(prompt, true); busy = true
                 scope.launch {
                     runCatching {
-                        withContext(Dispatchers.Default) { orchestrator.run(AgentRequest(UUID.randomUUID().toString(), prompt)) }
-                    }.onSuccess { result ->
-                        messages += ChatMessage(result.outputText ?: result.message, false, "${result.intent} · ${result.status} · deterministic local workflow")
-                        MonitorEventStore.record("Agent request completed", "${result.intent} · ${result.status}", true)
+                        if (providerConfig.isConfigured) {
+                            val history = messages.map { message -> (if (message.fromUser) "user" else "assistant") to message.text }
+                            providerClient.reply(providerConfig, history)
+                        } else {
+                            // Keep the supported offline task router, but never present its echo as generative AI.
+                            val local = withContext(Dispatchers.Default) {
+                                orchestrator.run(AgentRequest(UUID.randomUUID().toString(), prompt))
+                            }
+                            if (local.intent.name == "CONVERSATION") {
+                                throw IllegalStateException("No AI model is connected. Open Settings → AI Provider and configure an OpenAI-compatible API or Ollama endpoint. Offline workflow tasks remain available.")
+                            }
+                            local.outputText ?: local.message
+                        }
+                    }.onSuccess { answer ->
+                        messages += ChatMessage(answer, false, if (providerConfig.isConfigured) "${providerConfig.providerName} · ${providerConfig.model}" else "Offline task workflow · not an LLM response")
+                        MonitorEventStore.record("Chat response completed", if (providerConfig.isConfigured) providerConfig.model else "offline workflow", true)
                     }.onFailure { error ->
-                        messages += ChatMessage("The local workflow failed: ${error.message ?: error.javaClass.simpleName}", false)
-                        MonitorEventStore.record("Agent request failed", error.message ?: error.javaClass.simpleName, false)
+                        messages += ChatMessage(error.message ?: error.javaClass.simpleName, false, "Provider/workflow error")
+                        MonitorEventStore.record("Chat request failed", error.message ?: error.javaClass.simpleName, false)
                     }
                     busy = false
                 }
@@ -448,14 +473,28 @@ private fun MonitorScreen() {
 }
 
 @Composable
-private fun SettingsScreen() {
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+private fun SettingsScreen(providerStore: AiProviderStore) {
+    var config by remember { mutableStateOf(providerStore.load()) }
+    var status by remember { mutableStateOf("API key is encrypted with Android Keystore when saved. Use HTTPS for cloud endpoints.") }
+    var saved by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Settings", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         StatusLine("Application", "LIFEEASY 1.0.0", true)
         StatusLine("Data storage", "Encrypted on this device", true)
-        StatusLine("AI provider", "No provider configured", false)
-        StatusLine("Voice provider", "No provider configured", false)
-        StatusNote("Privacy", "Memory records are stored locally using the encrypted repository. Cloud processing is not active in this build.")
+        Text("AI PROVIDER", color = Cyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
+        OutlinedTextField(value = config.providerName, onValueChange = { config = config.copy(providerName = it) }, label = { Text("Provider name") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+        OutlinedTextField(value = config.baseUrl, onValueChange = { config = config.copy(baseUrl = it) }, label = { Text("API base URL") }, modifier = Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text("https://api.openai.com/v1") })
+        OutlinedTextField(value = config.model, onValueChange = { config = config.copy(model = it) }, label = { Text("Model ID") }, modifier = Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text("gpt-4o-mini or llama3.1") })
+        OutlinedTextField(value = config.apiKey, onValueChange = { config = config.copy(apiKey = it) }, label = { Text("API key (leave blank for local Ollama)") }, modifier = Modifier.fillMaxWidth(), singleLine = true, visualTransformation = PasswordVisualTransformation())
+        Button(onClick = {
+            runCatching { providerStore.save(config); config = providerStore.load(); saved = true; status = "Provider settings saved securely. Return to Chat to send a real model request." }
+                .onFailure { saved = false; status = "Could not save: ${it.message}" }
+        }, modifier = Modifier.fillMaxWidth()) { Text("Save AI Provider") }
+        OutlinedButton(onClick = { providerStore.clear(); config = providerStore.load(); saved = false; status = "Provider configuration cleared." }, modifier = Modifier.fillMaxWidth()) { Text("Disconnect provider") }
+        StatusNote(if (saved) "Provider saved" else "Provider setup", status)
+        StatusNote("Ollama on your phone", "For a PC-hosted Ollama server, set the base URL to http://YOUR-PC-LAN-IP:11434/v1, enable OLLAMA_HOST=0.0.0.0 on the PC, and allow port 11434 through the PC firewall. Do not use localhost on the phone.")
+        StatusNote("Privacy", "API keys are encrypted at rest with Android Keystore AES-GCM. Requests are sent to the endpoint you configure. Do not enter a key unless you trust that provider.")
+        StatusLine("Voice provider", "Not configured", false)
     }
 }
 
