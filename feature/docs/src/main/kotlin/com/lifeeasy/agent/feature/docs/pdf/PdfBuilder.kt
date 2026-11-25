@@ -16,6 +16,8 @@ class PdfBuilder {
     fun build(request: DocumentRequest, destination: File): DocumentResult {
         prepare(request, destination, "pdf")?.let { return it }
         val document = PdfDocument()
+        // Keep the active page in function scope so both catch/finally can clean it up.
+        var page: PdfDocument.Page? = null
         return try {
             val pageWidth = 595
             val pageHeight = 842
@@ -37,7 +39,6 @@ class PdfBuilder {
             }
             val rulePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.rgb(22, 119, 168); strokeWidth = 2f }
             var pageNumber = 0
-            var page: PdfDocument.Page? = null
             var canvas: Canvas? = null
             var y = 0f
             fun newPage() {
