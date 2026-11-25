@@ -4,10 +4,15 @@ package com.lifeeasy.agent
 import android.os.Bundle
 import android.app.ActivityManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.app.Activity
 import android.os.BatteryManager
 import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -57,6 +62,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
+import java.io.File
+import com.lifeeasy.agent.feature.docs.model.DocumentRequest
+import com.lifeeasy.agent.feature.docs.model.DocumentTable
+import com.lifeeasy.agent.feature.docs.pdf.PdfBuilder
+import com.lifeeasy.agent.feature.docs.word.DocxBuilder
+import com.lifeeasy.agent.feature.docs.presentation.PptxBuilder
+import com.lifeeasy.agent.feature.docs.spreadsheet.XlsxBuilder
 
 private val Ink = Color(0xFF050713)
 private val Panel = Color(0xFF0D1227)
@@ -215,7 +227,7 @@ private fun HomeScreen(onSelect: (Destination) -> Unit) {
                 WorkspaceRow(Icons.Outlined.Lock, "Private Memory", "Encrypted details stored on this device", Cyan) { onSelect(Destination.MEMORY) }
             }
         }
-        item { StatusNote("Offline workflow engine", "No cloud LLM is connected in this build. Supported local text workflows are available in Chat.") }
+        item { StatusNote("Offline workflow engine", "Connect OpenAI, Gemini, Groq or your local Ollama endpoint in Settings to enable generative chat. Offline task workflows remain available.") }
     }
 }
 
@@ -235,7 +247,7 @@ private fun EarthGlobeScene(modifier: Modifier = Modifier, modelScale: Float = 1
         position = Position(z = cameraDistance)
         lookAt(Position(0f, 0f, 0f))
     }
-    val mainLightNode = rememberMainLightNode(engine) { intensity = 55_000.0f }
+    val mainLightNode = rememberMainLightNode(engine) { intensity = 150_000.0f }
     val modelLoadResult = remember(modelLoader) {
         runCatching { modelLoader.createModelInstance("models/earth_globe_sci-fi_look.glb") }
     }
@@ -404,16 +416,108 @@ private fun LibraryScreen(onCreate: () -> Unit) {
     }
 }
 
+private enum class ExportFormat(val label: String, val extension: String, val mime: String) {
+    PDF("PDF", "pdf", "application/pdf"),
+    WORD("Word", "docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    POWERPOINT("PowerPoint", "pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
+    EXCEL("Excel", "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+}
+
 @Composable
 private fun CreateScreen() {
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var title by remember { mutableStateOf("My LIFEEASY Document") }
+    var body by remember { mutableStateOf("") }
+    var format by remember { mutableStateOf(ExportFormat.PDF) }
+    var status by remember { mutableStateOf("Write your content, choose a format, then export the real file to your device.") }
+    var busy by remember { mutableStateOf(false) }
+    var pendingFile by remember { mutableStateOf<File?>(null) }
+
+    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val uri = result.data?.data
+        val source = pendingFile
+        if (result.resultCode == Activity.RESULT_OK && uri != null && source?.isFile == true) {
+            busy = true
+            scope.launch {
+                val copied = withContext(Dispatchers.IO) {
+                    runCatching {
+                        context.contentResolver.openOutputStream(uri, "w")?.use { output ->
+                            source.inputStream().use { input -> input.copyTo(output) }
+                        } ?: error("Android did not provide a destination stream")
+                    }
+                }
+                status = copied.fold({ "Export saved successfully. You can open it from your device's file manager." }, { "Save failed: ${it.message}" })
+                busy = false
+            }
+        } else {
+            status = "Export cancelled. No file was saved."
+        }
+    }
+
+    fun exportDocument() {
+        if (title.isBlank() || body.isBlank()) {
+            status = "Document title and content are required."
+            return
+        }
+        if (busy) return
+        busy = true
+        status = "Preparing ${format.label} file…"
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val folder = File(context.cacheDir, "lifeasy_exports").apply { if (!exists() && !mkdirs()) error("Cannot create export folder") }
+                    val safeName = title.trim().replace(Regex("[^A-Za-z0-9._-]+"), "_").trim('_').take(70).ifBlank { "LIFEEASY_Document" }
+                    val destination = File(folder, "$safeName.${format.extension}")
+                    val lines = body.replace("\r\n", "\n").split('\n').map { it.trimEnd() }.filter { it.isNotBlank() }
+                    val table = if (format == ExportFormat.EXCEL) DocumentTable(listOf("Content"), lines.map { listOf(it) }) else null
+                    val request = DocumentRequest(title = title.trim(), paragraphs = lines, table = table).validated()
+                    val buildResult = when (format) {
+                        ExportFormat.PDF -> PdfBuilder().build(request, destination)
+                        ExportFormat.WORD -> DocxBuilder().build(request, destination)
+                        ExportFormat.POWERPOINT -> PptxBuilder().build(request, destination)
+                        ExportFormat.EXCEL -> XlsxBuilder().build(request, destination)
+                    }
+                    if (!buildResult.success || buildResult.file?.isFile != true || buildResult.file.length() <= 0L) {
+                        error(buildResult.error ?: "Builder did not produce a valid file")
+                    }
+                    buildResult.file
+                }
+            }
+            result.onSuccess { file ->
+                pendingFile = file
+                val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = format.mime
+                    putExtra(Intent.EXTRA_TITLE, file.name)
+                }
+                busy = false
+                status = "${format.label} file generated. Choose a folder in the Android save dialog."
+                saveLauncher.launch(intent)
+            }.onFailure { error ->
+                status = "Export failed: ${error.message ?: error.javaClass.simpleName}"
+                busy = false
+            }
+        }
+    }
+
+    Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Create Studio", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Text("Document export components are present in the project. The current UI does not yet connect the builders to editable document content.", color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
-        WorkspaceRow(Icons.Outlined.PictureAsPdf, "PDF document", "PDF builder module · UI export flow pending", Violet) { }
-        WorkspaceRow(Icons.Outlined.Description, "Word document", "DOCX builder module · UI export flow pending", Cyan) { }
-        WorkspaceRow(Icons.Outlined.Slideshow, "Presentation", "PPTX builder module · UI export flow pending", Violet) { }
-        WorkspaceRow(Icons.Outlined.TableChart, "Spreadsheet", "XLSX builder module · UI export flow pending", Cyan) { }
-        StatusNote("Not yet wired", "These cards describe existing code modules; they do not claim that a file has been generated or saved.")
+        Text("Create a real file from your own content. Files are generated on-device; no cloud provider is required.", color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
+        OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Document title") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+        OutlinedTextField(value = body, onValueChange = { body = it }, label = { Text("Content") }, placeholder = { Text("Write or paste your document content here. Each paragraph or line is included in the export.") }, modifier = Modifier.fillMaxWidth().heightIn(min = 170.dp), minLines = 7)
+        Text("EXPORT FORMAT", color = Cyan, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ExportFormat.entries.forEach { item ->
+                FilterChip(selected = format == item, onClick = { format = item }, label = { Text(item.label, fontSize = 10.sp) })
+            }
+        }
+        Button(onClick = { exportDocument() }, enabled = !busy && title.isNotBlank() && body.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
+            if (busy) CircularProgressIndicator(Modifier.size(17.dp), strokeWidth = 2.dp) else Icon(Icons.Outlined.FileDownload, null)
+            Spacer(Modifier.width(8.dp)); Text(if (busy) "Preparing…" else "Generate & Save ${format.label}")
+        }
+        StatusNote("Export status", status)
+        StatusNote("Current scope", "PDF, DOCX, PPTX and XLSX export are connected to the existing builders. This screen exports text content; advanced page layouts, embedded images, formulas, slide themes and print approval are separate enhancements.")
     }
 }
 
@@ -474,17 +578,41 @@ private fun MonitorScreen() {
 
 @Composable
 private fun SettingsScreen(providerStore: AiProviderStore) {
+    val context = LocalContext.current
     var config by remember { mutableStateOf(providerStore.load()) }
     var status by remember { mutableStateOf("API key is encrypted with Android Keystore when saved. Use HTTPS for cloud endpoints.") }
     var saved by remember { mutableStateOf(false) }
+
+    fun openExternal(url: String) {
+        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+            .onFailure { status = "Could not open browser: ${it.message}" }
+    }
+    fun chooseProvider(name: String, baseUrl: String, model: String, keyUrl: String) {
+        config = config.copy(providerName = name, baseUrl = baseUrl, model = model)
+        saved = false
+        openExternal(keyUrl)
+    }
+
     Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Settings", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         StatusLine("Application", "LIFEEASY 1.0.0", true)
         StatusLine("Data storage", "Encrypted on this device", true)
         Text("AI PROVIDER", color = Cyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
+        Text("Choose a provider. The button opens its official key page directly; create/copy your key there, return here, and paste it below.", color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
+        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            ProviderKeyRow("OpenAI", "Create API key", Icons.Outlined.OpenInNew, Violet) {
+                chooseProvider("OpenAI", "https://api.openai.com/v1", "gpt-4o-mini", "https://platform.openai.com/api-keys")
+            }
+            ProviderKeyRow("Google Gemini", "Open Google AI Studio API keys", Icons.Outlined.OpenInNew, Cyan) {
+                chooseProvider("Google Gemini (OpenAI compatible)", "https://generativelanguage.googleapis.com/v1beta/openai", "gemini-2.5-flash", "https://aistudio.google.com/app/apikey")
+            }
+            ProviderKeyRow("Groq", "Create Groq API key", Icons.Outlined.OpenInNew, Violet) {
+                chooseProvider("Groq", "https://api.groq.com/openai/v1", "openai/gpt-oss-120b", "https://console.groq.com/keys")
+            }
+        }
         OutlinedTextField(value = config.providerName, onValueChange = { config = config.copy(providerName = it) }, label = { Text("Provider name") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        OutlinedTextField(value = config.baseUrl, onValueChange = { config = config.copy(baseUrl = it) }, label = { Text("API base URL") }, modifier = Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text("https://api.openai.com/v1") })
-        OutlinedTextField(value = config.model, onValueChange = { config = config.copy(model = it) }, label = { Text("Model ID") }, modifier = Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text("gpt-4o-mini or llama3.1") })
+        OutlinedTextField(value = config.baseUrl, onValueChange = { config = config.copy(baseUrl = it) }, label = { Text("API base URL") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+        OutlinedTextField(value = config.model, onValueChange = { config = config.copy(model = it) }, label = { Text("Model ID") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
         OutlinedTextField(value = config.apiKey, onValueChange = { config = config.copy(apiKey = it) }, label = { Text("API key (leave blank for local Ollama)") }, modifier = Modifier.fillMaxWidth(), singleLine = true, visualTransformation = PasswordVisualTransformation())
         Button(onClick = {
             runCatching { providerStore.save(config); config = providerStore.load(); saved = true; status = "Provider settings saved securely. Return to Chat to send a real model request." }
@@ -492,9 +620,19 @@ private fun SettingsScreen(providerStore: AiProviderStore) {
         }, modifier = Modifier.fillMaxWidth()) { Text("Save AI Provider") }
         OutlinedButton(onClick = { providerStore.clear(); config = providerStore.load(); saved = false; status = "Provider configuration cleared." }, modifier = Modifier.fillMaxWidth()) { Text("Disconnect provider") }
         StatusNote(if (saved) "Provider saved" else "Provider setup", status)
-        StatusNote("Ollama on your phone", "For a PC-hosted Ollama server, set the base URL to http://YOUR-PC-LAN-IP:11434/v1, enable OLLAMA_HOST=0.0.0.0 on the PC, and allow port 11434 through the PC firewall. Do not use localhost on the phone.")
-        StatusNote("Privacy", "API keys are encrypted at rest with Android Keystore AES-GCM. Requests are sent to the endpoint you configure. Do not enter a key unless you trust that provider.")
+        StatusNote("Local Ollama", "For PC-hosted Ollama, use http://YOUR-PC-LAN-IP:11434/v1, enable OLLAMA_HOST=0.0.0.0 on the PC, and allow TCP 11434 through the PC firewall. Leave API key blank. Do not use localhost on the phone.")
+        StatusNote("Security & billing", "API keys are encrypted at rest with Android Keystore AES-GCM. Requests go to the endpoint you configure. Provider accounts may require billing or have rate limits; check the provider's pricing before use. Never share your key or commit it to GitHub.")
         StatusLine("Voice provider", "Not configured", false)
+    }
+}
+
+@Composable
+private fun ProviderKeyRow(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector, accent: Color, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Panel).border(1.dp, Line, RoundedCornerShape(14.dp)).clickable(onClick = onClick).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = accent)
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) { Text(title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold); Text(subtitle, color = Muted, fontSize = 10.sp) }
+        Icon(Icons.Outlined.Launch, null, tint = accent)
     }
 }
 
