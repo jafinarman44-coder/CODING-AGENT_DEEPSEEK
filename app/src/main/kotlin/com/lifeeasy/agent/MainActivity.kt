@@ -42,6 +42,7 @@ import com.lifeeasy.agent.feature.agent.DefaultAgentRuntime
 import com.lifeeasy.agent.feature.agent.model.AgentRequest
 import com.lifeeasy.agent.feature.memory.MemoryScreen
 import com.lifeeasy.agent.feature.monitor.MonitorEventStore
+import com.google.android.filament.utils.Manipulator
 import io.github.sceneview.Scene
 import io.github.sceneview.math.Position
 import io.github.sceneview.node.ModelNode
@@ -256,7 +257,7 @@ private fun EarthGlobeScene(modifier: Modifier = Modifier, modelScale: Float = 1
                 mainLightNode = mainLightNode,
                 childNodes = globeNodes,
                 isOpaque = false,
-                manipulator = null
+                manipulator = remember { Manipulator.Builder().build(Manipulator.Mode.ORBIT) }
             )
         } else {
             val reason = modelLoadResult.exceptionOrNull()?.message?.take(90) ?: "GLB is loading or failed to load"
