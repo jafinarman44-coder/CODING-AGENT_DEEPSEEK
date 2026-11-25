@@ -36,3 +36,8 @@ See `STEP-8-AGENT-CORE-REPORT.md` for the exact agent implementation, test evide
 
 
 See `STEP-9-DOCS-REPORT.md` for export formats, test evidence, and the Android-runtime verification boundary. DOCX/PPTX/XLSX use direct OOXML package generation; PDF and printing require Android runtime.
+
+
+## STEP 11 — User GLB Earth model
+
+The Home hero panel now uses the user-supplied animated GLB model through SceneView 2.3.0/Filament. The exact model file is bundled under `app/src/main/assets/models/`. See `STEP-11-GLB-EARTH-INTEGRATION-REPORT.md` and `THIRD-PARTY-ASSETS.md` for implementation details, validation limits, and attribution.
