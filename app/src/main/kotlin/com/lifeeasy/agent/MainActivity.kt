@@ -584,48 +584,92 @@ private fun MonitorScreen() {
 private fun SettingsScreen(providerStore: AiProviderStore) {
     val context = LocalContext.current
     var config by remember { mutableStateOf(providerStore.load()) }
-    var status by remember { mutableStateOf("API key is encrypted with Android Keystore when saved. Use HTTPS for cloud endpoints.") }
+    var status by remember { mutableStateOf("Select a provider and model. Availability and free quotas depend on the provider account.") }
     var saved by remember { mutableStateOf(false) }
+    var providerMenu by remember { mutableStateOf(false) }
+    var modelMenu by remember { mutableStateOf(false) }
+    var discoveredModels by remember { mutableStateOf<List<String>>(emptyList()) }
+    var loadingModels by remember { mutableStateOf(false) }
+    val settingsScope = rememberCoroutineScope()
+    val supportedProviders = ProviderCatalog.providers.filter { it.baseUrl.isNotBlank() }
+    var selectedProvider by remember {
+        mutableStateOf(supportedProviders.firstOrNull { it.name == config.providerName || config.providerName.startsWith(it.name) } ?: supportedProviders.first())
+    }
 
     fun openExternal(url: String) {
         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
             .onFailure { status = "Could not open browser: ${it.message}" }
     }
-    fun chooseProvider(name: String, baseUrl: String, model: String, keyUrl: String) {
-        config = config.copy(providerName = name, baseUrl = baseUrl, model = model)
+    fun applyProvider(provider: ProviderPreset) {
+        selectedProvider = provider
+        discoveredModels = emptyList()
+        config = config.copy(providerName = provider.name, baseUrl = provider.baseUrl,
+            model = provider.models.firstOrNull()?.id.orEmpty())
         saved = false
-        openExternal(keyUrl)
+        status = provider.note.ifBlank { "Choose a model, create an API key, paste it below, then save." }
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Settings", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         StatusLine("Application", "LIFEEASY 1.0.0", true)
-        StatusLine("Data storage", "Encrypted on this device", true)
-        Text("AI PROVIDER", color = Cyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
-        Text("Choose a provider. The button opens its official key page directly; create/copy your key there, return here, and paste it below.", color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
-        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            ProviderKeyRow("OpenAI", "Create API key", Icons.Outlined.OpenInNew, Violet) {
-                chooseProvider("OpenAI", "https://api.openai.com/v1", "gpt-4o-mini", "https://platform.openai.com/api-keys")
+        StatusLine("Appearance", "Dark theme only · Light theme is not enabled", true)
+        Text("AI PROVIDER & MODEL", color = Cyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
+        Text("Choose a provider and model from dropdowns. Free-tier labels are indicative only: quotas, eligibility and model availability can change. Confirm current availability in the provider console.", color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
+
+        Box {
+            OutlinedButton(onClick = { providerMenu = true }, modifier = Modifier.fillMaxWidth()) {
+                Text("Provider: ${selectedProvider.name}", color = Color.White)
+                Spacer(Modifier.weight(1f)); Icon(Icons.Outlined.ArrowDropDown, null, tint = Cyan)
             }
-            ProviderKeyRow("Google Gemini", "Open Google AI Studio API keys", Icons.Outlined.OpenInNew, Cyan) {
-                chooseProvider("Google Gemini (OpenAI compatible)", "https://generativelanguage.googleapis.com/v1beta/openai", "gemini-2.5-flash", "https://aistudio.google.com/app/apikey")
-            }
-            ProviderKeyRow("Groq", "Create Groq API key", Icons.Outlined.OpenInNew, Violet) {
-                chooseProvider("Groq", "https://api.groq.com/openai/v1", "openai/gpt-oss-120b", "https://console.groq.com/keys")
+            DropdownMenu(expanded = providerMenu, onDismissRequest = { providerMenu = false }) {
+                supportedProviders.forEach { provider ->
+                    DropdownMenuItem(text = { Text(provider.name) }, onClick = { applyProvider(provider); providerMenu = false })
+                }
             }
         }
-        OutlinedTextField(value = config.providerName, onValueChange = { config = config.copy(providerName = it) }, label = { Text("Provider name") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        OutlinedTextField(value = config.baseUrl, onValueChange = { config = config.copy(baseUrl = it) }, label = { Text("API base URL") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        OutlinedTextField(value = config.model, onValueChange = { config = config.copy(model = it) }, label = { Text("Model ID") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        OutlinedTextField(value = config.apiKey, onValueChange = { config = config.copy(apiKey = it) }, label = { Text("API key (leave blank for local Ollama)") }, modifier = Modifier.fillMaxWidth(), singleLine = true, visualTransformation = PasswordVisualTransformation())
+        Box {
+            OutlinedButton(onClick = { modelMenu = true }, modifier = Modifier.fillMaxWidth(), enabled = selectedProvider.models.isNotEmpty()) {
+                Text("Model: ${config.model.ifBlank { "Select model" }}", color = Color.White)
+                Spacer(Modifier.weight(1f)); Icon(Icons.Outlined.ArrowDropDown, null, tint = Cyan)
+            }
+            DropdownMenu(expanded = modelMenu, onDismissRequest = { modelMenu = false }) {
+                (discoveredModels.map { ModelPreset(it, "Available from provider API") } + selectedProvider.models).distinctBy { it.id }.forEach { model ->
+                    DropdownMenuItem(text = {
+                        Column { Text(model.id); Text(model.tier, color = Muted, fontSize = 10.sp) }
+                    }, onClick = { config = config.copy(model = model.id); modelMenu = false; saved = false })
+                }
+            }
+        }
+        OutlinedButton(onClick = {
+            settingsScope.launch {
+                loadingModels = true
+                runCatching { OpenAiCompatibleClient().listModels(config.copy(baseUrl = selectedProvider.baseUrl)) }
+                    .onSuccess { discoveredModels = it; status = if (it.isEmpty()) "Provider returned no models. Use the curated dropdown or enter a model ID manually." else "Loaded ${it.size} model IDs from ${selectedProvider.name}." }
+                    .onFailure { status = "Could not load model list: ${it.message}" }
+                loadingModels = false
+            }
+        }, modifier = Modifier.fillMaxWidth(), enabled = !loadingModels) {
+            Text(if (loadingModels) "Loading provider models…" else "Refresh model list from provider")
+        }
+        OutlinedButton(onClick = { openExternal(selectedProvider.keyUrl) }, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Outlined.OpenInNew, null); Spacer(Modifier.width(8.dp)); Text("Create / manage ${selectedProvider.name} API key")
+        }
+        OutlinedTextField(value = config.baseUrl, onValueChange = { config = config.copy(baseUrl = it); saved = false }, label = { Text("API base URL") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+        OutlinedTextField(value = config.model, onValueChange = { config = config.copy(model = it); saved = false }, label = { Text("Model ID (editable) ") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+        OutlinedTextField(value = config.apiKey, onValueChange = { config = config.copy(apiKey = it); saved = false }, label = { Text("API key (leave blank for local Ollama)") }, modifier = Modifier.fillMaxWidth(), singleLine = true, visualTransformation = PasswordVisualTransformation())
         Button(onClick = {
-            runCatching { providerStore.save(config); config = providerStore.load(); saved = true; status = "Provider settings saved securely. Return to Chat to send a real model request." }
-                .onFailure { saved = false; status = "Could not save: ${it.message}" }
+            runCatching {
+                require(config.baseUrl.isNotBlank()) { "This provider has no compatible public API endpoint in this app." }
+                providerStore.save(config); config = providerStore.load(); saved = true
+                status = "Provider settings saved. Send a test message in Chat. A 404 usually means the endpoint path or model ID is not available for this provider/account."
+            }.onFailure { saved = false; status = "Could not save: ${it.message}" }
         }, modifier = Modifier.fillMaxWidth()) { Text("Save AI Provider") }
         OutlinedButton(onClick = { providerStore.clear(); config = providerStore.load(); saved = false; status = "Provider configuration cleared." }, modifier = Modifier.fillMaxWidth()) { Text("Disconnect provider") }
         StatusNote(if (saved) "Provider saved" else "Provider setup", status)
-        StatusNote("Local Ollama", "For PC-hosted Ollama, use http://YOUR-PC-LAN-IP:11434/v1, enable OLLAMA_HOST=0.0.0.0 on the PC, and allow TCP 11434 through the PC firewall. Leave API key blank. Do not use localhost on the phone.")
-        StatusNote("Security & billing", "API keys are encrypted at rest with Android Keystore AES-GCM. Requests go to the endpoint you configure. Provider accounts may require billing or have rate limits; check the provider's pricing before use. Never share your key or commit it to GitHub.")
+        StatusNote("GitHub Copilot", "Copilot is shown as an informational option, not a connectable API provider: a Copilot subscription does not supply a general public Chat Completions API key for third-party apps.")
+        StatusNote("Free & paid models", "A model marked Free may have limited rate limits, regional restrictions, temporary availability or require a provider account. Paid models can incur charges. Check provider pricing before use.")
+        StatusNote("Local Ollama", "On a physical phone, use http://YOUR-PC-LAN-IP:11434/v1, enable OLLAMA_HOST=0.0.0.0 on the PC, and allow TCP 11434 through the PC firewall. Do not use localhost on the phone.")
+        StatusNote("Security", "API keys are encrypted at rest with Android Keystore AES-GCM. Never share your key or commit it to GitHub.")
         StatusLine("Voice provider", "Not configured", false)
     }
 }

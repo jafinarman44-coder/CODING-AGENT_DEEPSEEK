@@ -76,6 +76,20 @@ class OpenAiCompatibleClient(
         .callTimeout(100, TimeUnit.SECONDS)
         .build()
 ) {
+    suspend fun listModels(config: AiProviderConfig): List<String> = withContext(Dispatchers.IO) {
+        require(config.baseUrl.isNotBlank()) { "Provider endpoint is empty" }
+        require(AiProviderStore.isAllowedEndpoint(config.baseUrl)) { "Endpoint rejected" }
+        val endpoint = config.baseUrl.trimEnd('/') + "/models"
+        val builder = Request.Builder().url(endpoint).get().header("Accept", "application/json")
+        if (config.apiKey.isNotBlank()) builder.header("Authorization", "Bearer ${config.apiKey}")
+        http.newCall(builder.build()).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw IllegalStateException("Model list HTTP ${response.code} at $endpoint: ${body.take(350)}")
+            val data = JSONObject(body).optJSONArray("data") ?: JSONArray()
+            (0 until data.length()).mapNotNull { data.optJSONObject(it)?.optString("id")?.takeIf(String::isNotBlank) }.distinct().sorted()
+        }
+    }
+
     suspend fun reply(config: AiProviderConfig, conversation: List<Pair<String, String>>): String = withContext(Dispatchers.IO) {
         require(config.isConfigured) { "AI provider is not configured. Open Settings and add an endpoint and model." }
         require(AiProviderStore.isAllowedEndpoint(config.baseUrl)) { "Endpoint rejected. Use HTTPS or a private/local HTTP address." }
@@ -97,7 +111,7 @@ class OpenAiCompatibleClient(
             val responseText = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
                 val detail = runCatching { JSONObject(responseText).optJSONObject("error")?.optString("message") }.getOrNull()
-                throw IllegalStateException("Provider HTTP ${response.code}: ${detail?.takeIf { it.isNotBlank() } ?: response.message}")
+                throw IllegalStateException("Provider HTTP ${response.code} at $endpoint: ${detail?.takeIf { it.isNotBlank() } ?: responseText.take(500).ifBlank { response.message }}")
             }
             val root = JSONObject(responseText)
             val content = root.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")?.optString("content")
