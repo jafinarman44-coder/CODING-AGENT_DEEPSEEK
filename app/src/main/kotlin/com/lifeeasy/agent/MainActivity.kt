@@ -155,21 +155,29 @@ private fun StarField(modifier: Modifier = Modifier) {
 @Composable
 private fun BottomNavigationBar(selected: Destination, onSelect: (Destination) -> Unit) {
     val items = listOf(
-        Destination.HOME to Icons.Outlined.Home,
-        Destination.CHAT to Icons.Outlined.ChatBubbleOutline,
-        Destination.EXPLORE to Icons.Outlined.Explore,
-        Destination.CREATE to Icons.Outlined.AutoAwesome,
-        Destination.SETTINGS to Icons.Outlined.Settings
+        Triple(Destination.HOME, Icons.Outlined.Home, "Home"),
+        Triple(Destination.EXPLORE, Icons.Outlined.CheckCircleOutline, "Tasks"),
+        Triple(Destination.MONITOR, Icons.Outlined.BarChart, "Analytics"),
+        Triple(Destination.CHAT, Icons.Outlined.AutoAwesome, "AI"),
+        Triple(Destination.SETTINGS, Icons.Outlined.PersonOutline, "Profile")
     )
-    Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp)
-        .clip(RoundedCornerShape(22.dp)).background(Color(0xEE0B1024))
-        .border(1.dp, Violet.copy(.28f), RoundedCornerShape(22.dp)).padding(vertical = 5.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-        items.forEach { (destination, icon) ->
-            val active = selected == destination || (destination == Destination.EXPLORE && selected in listOf(Destination.LIBRARY, Destination.VOICE, Destination.MEMORY, Destination.MONITOR))
-            Column(Modifier.weight(1f).clip(RoundedCornerShape(15.dp)).clickable { onSelect(destination) }.padding(vertical = 5.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(icon, contentDescription = destination.title, tint = if (active) Cyan else Muted, modifier = Modifier.size(20.dp))
-                Text(destination.title, color = if (active) Color.White else Muted, fontSize = 9.sp, maxLines = 1)
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp)
+            .clip(RoundedCornerShape(25.dp)).background(Color(0xF20A1022))
+            .border(1.dp, Color(0xFF34466D), RoundedCornerShape(25.dp)).padding(horizontal = 5.dp, vertical = 7.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        items.forEach { (destination, icon, label) ->
+            val active = selected == destination || (destination == Destination.EXPLORE && selected in listOf(Destination.LIBRARY, Destination.CREATE))
+            Column(
+                Modifier.weight(1f).clip(RoundedCornerShape(18.dp))
+                    .background(if (active) Brush.verticalGradient(listOf(Color(0xFF254B86), Color(0xFF36205E))) else Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent)))
+                    .clickable { onSelect(destination) }.padding(vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(icon, contentDescription = label, tint = if (active) Cyan else Muted, modifier = Modifier.size(21.dp))
+                Text(label, color = if (active) Color.White else Muted, fontSize = 9.sp, maxLines = 1)
             }
         }
     }
@@ -177,59 +185,146 @@ private fun BottomNavigationBar(selected: Destination, onSelect: (Destination) -
 
 @Composable
 private fun TopBar(onSettings: () -> Unit, onSearch: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text("LIFEEASY", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 3.sp)
-            Text("YOUR AI COMPANION", color = Muted, fontSize = 8.sp, letterSpacing = 2.5.sp)
+    Row(Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(31.dp).clip(RoundedCornerShape(10.dp)).background(Brush.linearGradient(listOf(Violet, Cyan))), contentAlignment = Alignment.Center) {
+                Icon(Icons.Outlined.AutoAwesome, null, tint = Color.White, modifier = Modifier.size(18.dp))
+            }
+            Spacer(Modifier.width(9.dp))
+            Column {
+                Text("LIFEEASY", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.2.sp)
+                Text("YOUR SPACE TO GROW", color = Muted, fontSize = 7.sp, letterSpacing = 1.7.sp)
+            }
         }
         IconButton(onClick = onSearch) { Icon(Icons.Outlined.Search, null, tint = Color.White) }
-        IconButton(onClick = onSettings) { Icon(Icons.Outlined.NotificationsNone, null, tint = Color.White) }
-        Box(Modifier.size(34.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Violet, Cyan))), contentAlignment = Alignment.Center) {
-            Icon(Icons.Outlined.Person, null, tint = Color.White)
-        }
+        IconButton(onClick = onSettings) { Icon(Icons.Outlined.Settings, null, tint = Color.White) }
     }
 }
 
 @Composable
 private fun HomeScreen(onSelect: (Destination) -> Unit) {
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    val context = LocalContext.current
+    val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+    val greeting = when (hour) { in 5..11 -> "Good morning"; in 12..16 -> "Good afternoon"; in 17..21 -> "Good evening"; else -> "Welcome back" }
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 15.dp, end = 15.dp, top = 5.dp, bottom = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(13.dp)
+    ) {
         item {
-            Box(Modifier.fillMaxWidth().height(292.dp).clip(RoundedCornerShape(26.dp))
-                .background(Brush.linearGradient(listOf(Color(0xFF17113B), Color(0xFF09152C), Color(0xFF080B1A))))
-                .border(1.dp, Violet.copy(.28f), RoundedCornerShape(26.dp))) {
-                EarthGlobeScene(Modifier.align(Alignment.Center).fillMaxWidth(.82f).height(250.dp), modelScale = 1.42f, cameraDistance = 3.15f)
-                Column(Modifier.align(Alignment.TopStart).padding(17.dp)) {
-                    Text("YOUR PERSONAL AI", color = Cyan, fontSize = 9.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
-                    Text("Ideas into action.", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("THINK  ·  PLAN  ·  CREATE  ·  GROW", color = Cyan, fontSize = 9.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                Text(greeting, color = Muted, fontSize = 13.sp)
+                Text("Make ideas
+happen.", color = Color.White, fontSize = 29.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold)
+                Text("Your workspace, powered by LIFEEASY.", color = Muted, fontSize = 11.sp)
+            }
+        }
+        item {
+            Box(
+                Modifier.fillMaxWidth().height(258.dp).clip(RoundedCornerShape(28.dp))
+                    .background(Brush.linearGradient(listOf(Color(0xFF101B3A), Color(0xFF10112B), Color(0xFF071A2A))))
+                    .border(1.dp, Brush.linearGradient(listOf(Cyan.copy(.65f), Violet.copy(.55f), Color(0xFF263E69))), RoundedCornerShape(28.dp))
+            ) {
+                // The supplied GLB is rendered in the hero. A subtle Compose glow remains behind it
+                // so a device that cannot initialize Filament does not leave a black rectangle.
+                Box(Modifier.align(Alignment.Center).size(220.dp).background(Brush.radialGradient(listOf(Cyan.copy(.20f), Violet.copy(.12f), Color.Transparent)), CircleShape))
+                EarthGlobeScene(Modifier.align(Alignment.Center).fillMaxWidth(.82f).height(230.dp), modelScale = 1.32f, cameraDistance = 3.15f)
+                Column(Modifier.align(Alignment.TopStart).padding(16.dp)) {
+                    Text("YOUR AI COMPANION", color = Cyan, fontSize = 9.sp, letterSpacing = 1.7.sp, fontWeight = FontWeight.Bold)
+                    Text("Think beyond
+the ordinary.", color = Color.White, fontSize = 17.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
                 }
-                Surface(Modifier.align(Alignment.BottomCenter).padding(bottom = 13.dp), color = Color(0xCC11152D), shape = CircleShape, border = androidx.compose.foundation.BorderStroke(1.dp, Cyan.copy(.35f))) {
-                    Text("✦  Ask LIFEEASY anything", color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
+                Surface(
+                    Modifier.align(Alignment.BottomStart).padding(start = 14.dp, bottom = 13.dp).clickable { onSelect(Destination.CHAT) },
+                    color = Color(0xDD171C3A), shape = CircleShape,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Cyan.copy(.45f))
+                ) {
+                    Row(Modifier.padding(horizontal = 13.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.AutoAwesome, null, tint = Cyan, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(7.dp)); Text("Ask LIFEEASY", color = Color.White, fontSize = 11.sp)
+                    }
+                }
+                Column(Modifier.align(Alignment.CenterEnd).padding(end = 11.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HeroAction(Icons.Outlined.CenterFocusStrong, "FOCUS", Cyan) { onSelect(Destination.MONITOR) }
+                    HeroAction(Icons.Outlined.EventNote, "PLAN", Violet) { onSelect(Destination.EXPLORE) }
+                    HeroAction(Icons.Outlined.CheckCircle, "DO", Cyan) { onSelect(Destination.EXPLORE) }
                 }
             }
         }
-        item { Text("QUICK ACCESS", color = Muted, fontSize = 10.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold) }
         item {
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                QuickCard("Get Ideas", "Creative planning", Icons.Outlined.Lightbulb, Violet) { onSelect(Destination.CHAT) }
-                QuickCard("Summarize", "Text & meeting notes", Icons.Outlined.Description, Cyan) { onSelect(Destination.CHAT) }
-                QuickCard("Create", "Documents & files", Icons.Outlined.Image, Violet) { onSelect(Destination.CREATE) }
+            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                FeatureMetric(Modifier.weight(1f), Icons.Outlined.AutoAwesome, "AI CHAT", "Ask & explore", Cyan) { onSelect(Destination.CHAT) }
+                FeatureMetric(Modifier.weight(1f), Icons.Outlined.Description, "CREATE", "Build documents", Violet) { onSelect(Destination.CREATE) }
+                FeatureMetric(Modifier.weight(1f), Icons.Outlined.Mic, "VOICE", "Speak naturally", Color(0xFFFF8EDB)) { onSelect(Destination.VOICE) }
             }
         }
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Your workspace", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.weight(1f))
-                Text("VIEW ALL", color = Cyan, fontSize = 9.sp, modifier = Modifier.clickable { onSelect(Destination.LIBRARY) })
+                Column(Modifier.weight(1f)) {
+                    Text("Your workspace", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Pick up where you want to begin", color = Muted, fontSize = 10.sp)
+                }
+                Text("VIEW ALL", color = Cyan, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { onSelect(Destination.EXPLORE) })
             }
         }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                WorkspaceRow(Icons.Outlined.Chat, "AI Conversation", "Chat with the local workflow assistant", Cyan) { onSelect(Destination.CHAT) }
-                WorkspaceRow(Icons.Outlined.Folder, "Document Studio", "PDF, Word, PowerPoint and Excel tools", Violet) { onSelect(Destination.CREATE) }
-                WorkspaceRow(Icons.Outlined.Lock, "Private Memory", "Encrypted details stored on this device", Cyan) { onSelect(Destination.MEMORY) }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                DashboardTile(Modifier.weight(1f), Icons.Outlined.FolderOpen, "My Library", "Your saved files", Cyan) { onSelect(Destination.LIBRARY) }
+                DashboardTile(Modifier.weight(1f), Icons.Outlined.Insights, "Activity", "System overview", Violet) { onSelect(Destination.MONITOR) }
             }
         }
-        item { StatusNote("One-step AI setup", "Add one Google AI Studio API key in Settings. Chat uses Gemini; built-in Android voice and document export work without another key. Ollama is optional.") }
+        item {
+            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp))
+                .background(Brush.linearGradient(listOf(Color(0xFF142A49), Color(0xFF1B1740), Color(0xFF10182C))))
+                .border(1.dp, Violet.copy(.42f), RoundedCornerShape(22.dp)).padding(15.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(54.dp).clip(CircleShape).background(Brush.radialGradient(listOf(Cyan.copy(.55f), Violet.copy(.35f), Color.Transparent))), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Outlined.SmartToy, null, tint = Color.White, modifier = Modifier.size(34.dp))
+                    }
+                    Spacer(Modifier.width(11.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("AI Assistant", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Your personal thinking partner", color = Muted, fontSize = 10.sp)
+                    }
+                    Button(onClick = { onSelect(Destination.CHAT) }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp), colors = ButtonDefaults.buttonColors(containerColor = Violet)) {
+                        Text("Ask", fontSize = 11.sp)
+                    }
+                }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                DashboardTile(Modifier.weight(1f), Icons.Outlined.Lock, "Private Memory", "On-device space", Cyan) { onSelect(Destination.MEMORY) }
+                DashboardTile(Modifier.weight(1f), Icons.Outlined.Tune, "Preferences", "Make it yours", Violet) { onSelect(Destination.SETTINGS) }
+            }
+        }
+        item { Text("LIFEEASY · A calmer way to get things done", color = Muted.copy(.75f), fontSize = 9.sp, modifier = Modifier.fillMaxWidth().padding(top = 3.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center) }
+    }
+}
+
+@Composable
+private fun HeroAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, accent: Color, onClick: () -> Unit) {
+    Row(Modifier.clip(RoundedCornerShape(14.dp)).background(Color(0xB90C1530)).border(1.dp, accent.copy(.35f), RoundedCornerShape(14.dp)).clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = accent, modifier = Modifier.size(15.dp)); Spacer(Modifier.width(5.dp)); Text(label, color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun FeatureMetric(modifier: Modifier, icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String, accent: Color, onClick: () -> Unit) {
+    Column(modifier.height(105.dp).clip(RoundedCornerShape(19.dp)).background(Brush.linearGradient(listOf(Color(0xFF142039), Color(0xFF0A1022))))
+        .border(1.dp, accent.copy(.35f), RoundedCornerShape(19.dp)).clickable(onClick = onClick).padding(11.dp), verticalArrangement = Arrangement.SpaceBetween) {
+        Icon(icon, null, tint = accent, modifier = Modifier.size(21.dp))
+        Column { Text(label, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold); Text(value, color = Muted, fontSize = 9.sp, maxLines = 1) }
+    }
+}
+
+@Composable
+private fun DashboardTile(modifier: Modifier, icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, accent: Color, onClick: () -> Unit) {
+    Row(modifier.height(82.dp).clip(RoundedCornerShape(18.dp)).background(Panel.copy(.96f)).border(1.dp, Line, RoundedCornerShape(18.dp)).clickable(onClick = onClick).padding(11.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(37.dp).clip(RoundedCornerShape(12.dp)).background(accent.copy(.13f)), contentAlignment = Alignment.Center) { Icon(icon, null, tint = accent, modifier = Modifier.size(20.dp)) }
+        Spacer(Modifier.width(9.dp))
+        Column(Modifier.weight(1f)) { Text(title, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold); Text(subtitle, color = Muted, fontSize = 9.sp, maxLines = 2) }
     }
 }
 
