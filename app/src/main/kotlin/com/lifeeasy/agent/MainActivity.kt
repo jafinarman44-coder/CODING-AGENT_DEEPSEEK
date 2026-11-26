@@ -215,8 +215,7 @@ private fun HomeScreen(onSelect: (Destination) -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("THINK  ·  PLAN  ·  CREATE  ·  GROW", color = Cyan, fontSize = 9.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                 Text(greeting, color = Muted, fontSize = 13.sp)
-                Text("Make ideas
-happen.", color = Color.White, fontSize = 29.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold)
+                Text("Make ideas\nhappen.", color = Color.White, fontSize = 29.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold)
                 Text("Your workspace, powered by LIFEEASY.", color = Muted, fontSize = 11.sp)
             }
         }
@@ -232,8 +231,7 @@ happen.", color = Color.White, fontSize = 29.sp, lineHeight = 32.sp, fontWeight 
                 EarthGlobeScene(Modifier.align(Alignment.Center).fillMaxWidth(.82f).height(230.dp), modelScale = 1.32f, cameraDistance = 3.15f)
                 Column(Modifier.align(Alignment.TopStart).padding(16.dp)) {
                     Text("YOUR AI COMPANION", color = Cyan, fontSize = 9.sp, letterSpacing = 1.7.sp, fontWeight = FontWeight.Bold)
-                    Text("Think beyond
-the ordinary.", color = Color.White, fontSize = 17.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Think beyond\nthe ordinary.", color = Color.White, fontSize = 17.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
                 }
                 Surface(
                     Modifier.align(Alignment.BottomStart).padding(start = 14.dp, bottom = 13.dp).clickable { onSelect(Destination.CHAT) },
