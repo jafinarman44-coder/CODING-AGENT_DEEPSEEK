@@ -51,6 +51,7 @@ import com.lifeeasy.agent.feature.memory.MemoryScreen
 import com.lifeeasy.agent.feature.monitor.MonitorEventStore
 import com.google.android.filament.utils.Manipulator
 import io.github.sceneview.Scene
+import io.github.sceneview.SurfaceType
 import io.github.sceneview.math.Position
 import io.github.sceneview.node.ModelNode
 import io.github.sceneview.rememberCameraNode
@@ -115,10 +116,9 @@ private fun LifeEasyShell(memoryRepository: EncryptedMemoryRepository) {
     val providerStore = remember(context) { AiProviderStore(context) }
     Box(Modifier.fillMaxSize().background(Ink)) {
         StarField(Modifier.fillMaxSize())
-        Row(Modifier.fillMaxSize()) {
-            NavigationRail(selected = selected, onSelect = { selected = it })
-            Column(Modifier.fillMaxSize()) {
-                TopBar(onSettings = { selected = Destination.SETTINGS }, onSearch = { selected = Destination.EXPLORE })
+        Column(Modifier.fillMaxSize()) {
+            TopBar(onSettings = { selected = Destination.SETTINGS }, onSearch = { selected = Destination.EXPLORE })
+            Box(Modifier.weight(1f).fillMaxWidth()) {
                 when (selected) {
                     Destination.HOME -> HomeScreen(onSelect = { selected = it })
                     Destination.CHAT -> ChatScreen(providerStore)
@@ -131,6 +131,7 @@ private fun LifeEasyShell(memoryRepository: EncryptedMemoryRepository) {
                     Destination.SETTINGS -> SettingsScreen(providerStore)
                 }
             }
+            BottomNavigationBar(selected = selected, onSelect = { selected = it })
         }
     }
 }
@@ -152,36 +153,24 @@ private fun StarField(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun NavigationRail(selected: Destination, onSelect: (Destination) -> Unit) {
-    val destinations = listOf(
-        Destination.HOME to Icons.Outlined.Home, Destination.CHAT to Icons.Outlined.ChatBubbleOutline,
-        Destination.EXPLORE to Icons.Outlined.Explore, Destination.LIBRARY to Icons.Outlined.FolderOpen,
-        Destination.CREATE to Icons.Outlined.AutoAwesome, Destination.VOICE to Icons.Outlined.Mic,
-        Destination.MEMORY to Icons.Outlined.Lock, Destination.MONITOR to Icons.Outlined.MonitorHeart
+private fun BottomNavigationBar(selected: Destination, onSelect: (Destination) -> Unit) {
+    val items = listOf(
+        Destination.HOME to Icons.Outlined.Home,
+        Destination.CHAT to Icons.Outlined.ChatBubbleOutline,
+        Destination.EXPLORE to Icons.Outlined.Explore,
+        Destination.CREATE to Icons.Outlined.AutoAwesome,
+        Destination.SETTINGS to Icons.Outlined.Settings
     )
-    Column(
-        Modifier.width(68.dp).fillMaxHeight().padding(start = 7.dp, top = 10.dp, bottom = 10.dp)
-            .clip(RoundedCornerShape(24.dp)).background(Color(0xCC090E22))
-            .border(1.dp, Violet.copy(alpha = .30f), RoundedCornerShape(24.dp)).padding(vertical = 9.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(5.dp)
-    ) {
-        Text("✦", color = Cyan, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 5.dp))
-        destinations.forEach { (destination, icon) ->
-            val active = selected == destination
-            Column(
-                Modifier.fillMaxWidth().padding(horizontal = 5.dp).clip(RoundedCornerShape(15.dp))
-                    .background(if (active) Brush.verticalGradient(listOf(Violet.copy(.38f), Cyan.copy(.12f))) else Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent)))
-                    .clickable { onSelect(destination) }.padding(vertical = 9.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Icon(icon, contentDescription = destination.title, tint = if (active) Color.White else Muted, modifier = Modifier.size(21.dp))
-                Text(destination.title, fontSize = 9.sp, color = if (active) Color.White else Muted, maxLines = 1)
+    Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp)
+        .clip(RoundedCornerShape(22.dp)).background(Color(0xEE0B1024))
+        .border(1.dp, Violet.copy(.28f), RoundedCornerShape(22.dp)).padding(vertical = 5.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+        items.forEach { (destination, icon) ->
+            val active = selected == destination || (destination == Destination.EXPLORE && selected in listOf(Destination.LIBRARY, Destination.VOICE, Destination.MEMORY, Destination.MONITOR))
+            Column(Modifier.weight(1f).clip(RoundedCornerShape(15.dp)).clickable { onSelect(destination) }.padding(vertical = 5.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(icon, contentDescription = destination.title, tint = if (active) Cyan else Muted, modifier = Modifier.size(20.dp))
+                Text(destination.title, color = if (active) Color.White else Muted, fontSize = 9.sp, maxLines = 1)
             }
-        }
-        Spacer(Modifier.weight(1f))
-        IconButton(onClick = { onSelect(Destination.SETTINGS) }) {
-            Icon(Icons.Outlined.Settings, contentDescription = "Settings", tint = if (selected == Destination.SETTINGS) Cyan else Muted)
         }
     }
 }
@@ -205,15 +194,16 @@ private fun TopBar(onSettings: () -> Unit, onSearch: () -> Unit) {
 private fun HomeScreen(onSelect: (Destination) -> Unit) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
-            Box(Modifier.fillMaxWidth().height(252.dp)) {
-                EarthGlobeScene(Modifier.align(Alignment.CenterStart).fillMaxWidth(.54f).height(220.dp), modelScale = 1.35f, cameraDistance = 3.25f)
-                Column(Modifier.align(Alignment.CenterEnd).width(135.dp).padding(end = 2.dp)) {
-                    Text("Hello,", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Light)
-                    Text("Welcome", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold, lineHeight = 29.sp)
-                    Spacer(Modifier.height(8.dp))
-                    Text("How can I help you today?", color = Muted, fontSize = 12.sp, lineHeight = 17.sp)
-                    Spacer(Modifier.height(10.dp))
-                    Text("✦  LIFEEASY", color = Cyan, fontSize = 10.sp, letterSpacing = 1.sp)
+            Box(Modifier.fillMaxWidth().height(292.dp).clip(RoundedCornerShape(26.dp))
+                .background(Brush.linearGradient(listOf(Color(0xFF17113B), Color(0xFF09152C), Color(0xFF080B1A))))
+                .border(1.dp, Violet.copy(.28f), RoundedCornerShape(26.dp))) {
+                EarthGlobeScene(Modifier.align(Alignment.Center).fillMaxWidth(.82f).height(250.dp), modelScale = 1.42f, cameraDistance = 3.15f)
+                Column(Modifier.align(Alignment.TopStart).padding(17.dp)) {
+                    Text("YOUR PERSONAL AI", color = Cyan, fontSize = 9.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                    Text("Ideas into action.", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Surface(Modifier.align(Alignment.BottomCenter).padding(bottom = 13.dp), color = Color(0xCC11152D), shape = CircleShape, border = androidx.compose.foundation.BorderStroke(1.dp, Cyan.copy(.35f))) {
+                    Text("✦  Ask LIFEEASY anything", color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
                 }
             }
         }
@@ -239,7 +229,7 @@ private fun HomeScreen(onSelect: (Destination) -> Unit) {
                 WorkspaceRow(Icons.Outlined.Lock, "Private Memory", "Encrypted details stored on this device", Cyan) { onSelect(Destination.MEMORY) }
             }
         }
-        item { StatusNote("Offline workflow engine", "Connect OpenAI, Gemini, Groq or your local Ollama endpoint in Settings to enable generative chat. Offline task workflows remain available.") }
+        item { StatusNote("One-step AI setup", "Add one Google AI Studio API key in Settings. Chat uses Gemini; built-in Android voice and document export work without another key. Ollama is optional.") }
     }
 }
 
@@ -273,6 +263,7 @@ private fun EarthGlobeScene(modifier: Modifier = Modifier, modelScale: Float = 1
         if (modelInstance != null && globeNodes.isNotEmpty()) {
             Scene(
                 modifier = Modifier.fillMaxSize(),
+                surfaceType = SurfaceType.TextureSurface,
                 engine = engine,
                 modelLoader = modelLoader,
                 environmentLoader = environmentLoader,
@@ -331,6 +322,10 @@ private fun ChatScreen(providerStore: AiProviderStore) {
     var input by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     val messages = remember { mutableStateListOf<ChatMessage>() }
+    val chatSpeechLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull().orEmpty()
+        if (spoken.isNotBlank()) input = listOf(input, spoken).filter { it.isNotBlank() }.joinToString(" ")
+    }
     Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) { Text("AI Conversation", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold); Text(if (providerConfig.isConfigured) "${providerConfig.providerName} · ${providerConfig.model}" else "No language model connected · configure in Settings", color = Muted, fontSize = 10.sp) }
@@ -361,7 +356,15 @@ private fun ChatScreen(providerStore: AiProviderStore) {
         Row(Modifier.fillMaxWidth().padding(bottom = 8.dp).clip(RoundedCornerShape(24.dp)).background(Panel2)
             .border(1.dp, Violet.copy(.55f), RoundedCornerShape(24.dp)).padding(start = 15.dp, end = 7.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             BasicTextField(value = input, onValueChange = { input = it }, modifier = Modifier.weight(1f), textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 13.sp), cursorBrush = SolidColor(Cyan), decorationBox = { inner -> Box { if (input.isBlank()) Text("Message LIFEEASY…", color = Muted, fontSize = 13.sp); inner() } })
-            IconButton(onClick = { /* microphone provider is not connected yet */ }, enabled = false) { Icon(Icons.Outlined.Mic, null, tint = Muted) }
+            IconButton(onClick = {
+                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, "bn-BD")
+                    putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to LIFEEASY")
+                    putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                }
+                runCatching { chatSpeechLauncher.launch(intent) }.onFailure { messages += ChatMessage("Speech recognition unavailable: ${it.message}", false, "Voice input") }
+            }) { Icon(Icons.Outlined.Mic, null, tint = Cyan) }
             IconButton(enabled = input.isNotBlank() && !busy, onClick = {
                 val prompt = input.trim(); input = ""; messages += ChatMessage(prompt, true); busy = true
                 scope.launch {
@@ -408,7 +411,10 @@ private fun ExploreScreen(onSelect: (Destination) -> Unit) {
         WorkspaceRow(Icons.Outlined.Translate, "Translation", "Translation engine is not connected", Cyan) { onSelect(Destination.CHAT) }
         WorkspaceRow(Icons.Outlined.Description, "Document outline", "Create a structured outline from a prompt", Violet) { onSelect(Destination.CHAT) }
         WorkspaceRow(Icons.Outlined.Mic, "Voice assistant", "Device speech recognition and no-key TTS", Cyan) { onSelect(Destination.VOICE) }
-        StatusNote("Capability notice", "Web search, image generation and cloud AI require provider integrations and are not active in this offline build.")
+        WorkspaceRow(Icons.Outlined.FolderOpen, "Library", "Browse your saved work", Violet) { onSelect(Destination.LIBRARY) }
+        WorkspaceRow(Icons.Outlined.Lock, "Private memory", "Encrypted notes and context", Cyan) { onSelect(Destination.MEMORY) }
+        WorkspaceRow(Icons.Outlined.MonitorHeart, "System monitor", "Device and app diagnostics", Violet) { onSelect(Destination.MONITOR) }
+        StatusNote("Capability notice", "Gemini chat uses one Google AI Studio API key. On-device voice and file export do not require another cloud key. Web search and image generation are separate integrations.")
     }
 }
 
@@ -644,8 +650,9 @@ private fun MonitorScreen() {
         StatusLine("Battery", battery?.let { "$it%" } ?: "Unavailable on this device", (battery ?: 0) > 10)
         StatusLine("Encrypted memory", "Repository connected", true)
         StatusLine("Offline workflow engine", "Connected · ${events.size} recent run(s)", true)
-        StatusLine("Document export UI", "Not connected to editable export workflow", false)
-        StatusLine("Cloud LLM / Voice / Web search", "Not configured in this build", false)
+        StatusLine("Document export", "PDF / DOCX / PPTX / XLSX builders connected", true)
+        StatusLine("AI chat", if (AiProviderStore(context).load().isConfigured) "API key and model configured" else "API key not configured · open Settings", AiProviderStore(context).load().isConfigured)
+        StatusLine("Voice", "Android system speech engine · no cloud key", true)
         Text("RECENT AGENT ACTIVITY", color = Muted, fontSize = 10.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Bold)
         if (events.isEmpty()) {
             StatusNote("No agent runs recorded", "Send a message from Chat. Successes and runtime failures will appear here.")
@@ -661,93 +668,50 @@ private fun MonitorScreen() {
 private fun SettingsScreen(providerStore: AiProviderStore) {
     val context = LocalContext.current
     var config by remember { mutableStateOf(providerStore.load()) }
-    var status by remember { mutableStateOf("Select a provider and model. Availability and free quotas depend on the provider account.") }
-    var saved by remember { mutableStateOf(false) }
-    var providerMenu by remember { mutableStateOf(false) }
-    var modelMenu by remember { mutableStateOf(false) }
-    var discoveredModels by remember { mutableStateOf<List<String>>(emptyList()) }
-    var loadingModels by remember { mutableStateOf(false) }
-    val settingsScope = rememberCoroutineScope()
-    val supportedProviders = ProviderCatalog.providers.filter { it.baseUrl.isNotBlank() }
-    var selectedProvider by remember {
-        mutableStateOf(supportedProviders.firstOrNull { it.name == config.providerName || config.providerName.startsWith(it.name) } ?: supportedProviders.first())
-    }
-
-    fun openExternal(url: String) {
-        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+    var status by remember { mutableStateOf(if (config.apiKey.isBlank()) "One-time setup: paste your Google AI Studio API key and save." else "Gemini settings loaded. Your key is stored encrypted on this phone.") }
+    var busy by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val gemini = ProviderCatalog.providers.first { it.name == "Google Gemini" }
+    fun openKeyPage() {
+        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(gemini.keyUrl))) }
             .onFailure { status = "Could not open browser: ${it.message}" }
     }
-    fun applyProvider(provider: ProviderPreset) {
-        selectedProvider = provider
-        discoveredModels = emptyList()
-        config = config.copy(providerName = provider.name, baseUrl = provider.baseUrl,
-            model = provider.models.firstOrNull()?.id.orEmpty())
-        saved = false
-        status = provider.note.ifBlank { "Choose a model, create an API key, paste it below, then save." }
-    }
-
-    Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Settings", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        StatusLine("Application", "LIFEEASY 1.0.0", true)
-        StatusLine("Appearance", "Dark theme only · Light theme is not enabled", true)
-        Text("AI PROVIDER & MODEL", color = Cyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
-        Text("Choose a provider and model from dropdowns. Free-tier labels are indicative only: quotas, eligibility and model availability can change. Confirm current availability in the provider console.", color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
-
-        Box {
-            OutlinedButton(onClick = { providerMenu = true }, modifier = Modifier.fillMaxWidth()) {
-                Text("Provider: ${selectedProvider.name}", color = Color.White)
-                Spacer(Modifier.weight(1f)); Icon(Icons.Outlined.ArrowDropDown, null, tint = Cyan)
-            }
-            DropdownMenu(expanded = providerMenu, onDismissRequest = { providerMenu = false }) {
-                supportedProviders.forEach { provider ->
-                    DropdownMenuItem(text = { Text(provider.name) }, onClick = { applyProvider(provider); providerMenu = false })
-                }
+    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Your AI setup", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+        Text("Connect once. LIFEEASY will use Gemini for chat. No Ollama installation or PC setup is required.", color = Muted, fontSize = 12.sp, lineHeight = 18.sp)
+        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Brush.linearGradient(listOf(Color(0xFF211542), Color(0xFF0B1830)))).border(1.dp, Violet.copy(.5f), RoundedCornerShape(18.dp)).padding(14.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Outlined.AutoAwesome, null, tint = Cyan); Spacer(Modifier.width(8.dp)); Text("GOOGLE GEMINI", color = Color.White, fontWeight = FontWeight.Bold) }
+                Text("Default model: gemini-3.8-flash", color = Cyan, fontSize = 12.sp)
+                Text("A Google AI Studio API key is required. It is not the same as your Google account password.", color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
+                TextButton(onClick = { openKeyPage() }) { Text("Get a free-tier API key  ↗", color = Cyan) }
             }
         }
-        Box {
-            OutlinedButton(onClick = { modelMenu = true }, modifier = Modifier.fillMaxWidth(), enabled = selectedProvider.models.isNotEmpty()) {
-                Text("Model: ${config.model.ifBlank { "Select model" }}", color = Color.White)
-                Spacer(Modifier.weight(1f)); Icon(Icons.Outlined.ArrowDropDown, null, tint = Cyan)
-            }
-            DropdownMenu(expanded = modelMenu, onDismissRequest = { modelMenu = false }) {
-                (discoveredModels.map { ModelPreset(it, "Available from provider API") } + selectedProvider.models).distinctBy { it.id }.forEach { model ->
-                    DropdownMenuItem(text = {
-                        Column { Text(model.id); Text(model.tier, color = Muted, fontSize = 10.sp) }
-                    }, onClick = { config = config.copy(model = model.id); modelMenu = false; saved = false })
-                }
-            }
-        }
-        OutlinedButton(onClick = {
-            settingsScope.launch {
-                loadingModels = true
-                runCatching { OpenAiCompatibleClient().listModels(config.copy(baseUrl = selectedProvider.baseUrl)) }
-                    .onSuccess { discoveredModels = it; status = if (it.isEmpty()) "Provider returned no models. Use the curated dropdown or enter a model ID manually." else "Loaded ${it.size} model IDs from ${selectedProvider.name}." }
-                    .onFailure { status = "Could not load model list: ${it.message}" }
-                loadingModels = false
-            }
-        }, modifier = Modifier.fillMaxWidth(), enabled = !loadingModels) {
-            Text(if (loadingModels) "Loading provider models…" else "Refresh model list from provider")
-        }
-        OutlinedButton(onClick = { openExternal(selectedProvider.keyUrl) }, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Outlined.OpenInNew, null); Spacer(Modifier.width(8.dp)); Text("Create / manage ${selectedProvider.name} API key")
-        }
-        OutlinedTextField(value = config.baseUrl, onValueChange = { config = config.copy(baseUrl = it); saved = false }, label = { Text("API base URL") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        OutlinedTextField(value = config.model, onValueChange = { config = config.copy(model = it); saved = false }, label = { Text("Model ID (editable) ") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        OutlinedTextField(value = config.apiKey, onValueChange = { config = config.copy(apiKey = it); saved = false }, label = { Text("API key (leave blank for local Ollama)") }, modifier = Modifier.fillMaxWidth(), singleLine = true, visualTransformation = PasswordVisualTransformation())
+        OutlinedTextField(value = config.apiKey, onValueChange = { config = config.copy(apiKey = it.trim(), providerName = "Google Gemini", baseUrl = gemini.baseUrl, model = "gemini-3.8-flash") }, label = { Text("Paste Gemini API key") }, placeholder = { Text("AIza…") }, modifier = Modifier.fillMaxWidth(), singleLine = true, visualTransformation = PasswordVisualTransformation())
         Button(onClick = {
             runCatching {
-                require(config.baseUrl.isNotBlank()) { "This provider has no compatible public API endpoint in this app." }
-                providerStore.save(config); config = providerStore.load(); saved = true
-                status = "Provider settings saved. Send a test message in Chat. A 404 usually means the endpoint path or model ID is not available for this provider/account."
-            }.onFailure { saved = false; status = "Could not save: ${it.message}" }
-        }, modifier = Modifier.fillMaxWidth()) { Text("Save AI Provider") }
-        OutlinedButton(onClick = { providerStore.clear(); config = providerStore.load(); saved = false; status = "Provider configuration cleared." }, modifier = Modifier.fillMaxWidth()) { Text("Disconnect provider") }
-        StatusNote(if (saved) "Provider saved" else "Provider setup", status)
-        StatusNote("GitHub Copilot", "Copilot is shown as an informational option, not a connectable API provider: a Copilot subscription does not supply a general public Chat Completions API key for third-party apps.")
-        StatusNote("Free & paid models", "A model marked Free may have limited rate limits, regional restrictions, temporary availability or require a provider account. Paid models can incur charges. Check provider pricing before use.")
-        StatusNote("Local Ollama", "On a physical phone, use http://YOUR-PC-LAN-IP:11434/v1, enable OLLAMA_HOST=0.0.0.0 on the PC, and allow TCP 11434 through the PC firewall. Do not use localhost on the phone.")
-        StatusNote("Security", "API keys are encrypted at rest with Android Keystore AES-GCM. Never share your key or commit it to GitHub.")
-        StatusLine("Voice provider", "Android system TTS · no API key required", true)
+                require(config.apiKey.isNotBlank()) { "Paste your Google AI Studio API key first." }
+                providerStore.save(config.copy(providerName = "Google Gemini", baseUrl = gemini.baseUrl, model = "gemini-3.8-flash"))
+                config = providerStore.load()
+                status = "Saved securely. Return to Chat and send a message to test the connection."
+            }.onFailure { status = "Setup failed: ${it.message}" }
+        }, enabled = config.apiKey.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.Lock, null); Spacer(Modifier.width(8.dp)); Text("Save & connect Gemini") }
+        OutlinedButton(onClick = {
+            scope.launch {
+                busy = true
+                status = "Checking Gemini API key…"
+                val check = runCatching { OpenAiCompatibleClient().listModels(config.copy(providerName = "Google Gemini", baseUrl = gemini.baseUrl)) }
+                status = check.fold({ models -> if (models.isNotEmpty()) "Connection check passed. ${models.size} model IDs returned by Google." else "Google returned no model IDs. Try sending a chat message; model discovery may be unavailable for this key." }, { "Connection check failed: ${it.message}" })
+                busy = false
+            }
+        }, enabled = config.apiKey.isNotBlank() && !busy, modifier = Modifier.fillMaxWidth()) { if (busy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp) else Icon(Icons.Outlined.WifiTethering, null); Spacer(Modifier.width(8.dp)); Text(if (busy) "Checking…" else "Check API key") }
+        StatusNote("Setup status", status)
+        StatusLine("Voice", "Built-in Android voice · no API key", true)
+        StatusLine("Document export", "PDF, Word, PowerPoint and Excel · offline", true)
+        StatusLine("Local Ollama", "Optional only · not needed to use LIFEEASY", true)
+        StatusNote("About 503 errors", "If Google is temporarily overloaded, LIFEEASY retries automatically. If the service remains unavailable, wait and retry; the app cannot control Google's capacity.")
+        StatusNote("Privacy", "The API key is encrypted with Android Keystore on this device. Do not paste it into GitHub, screenshots or public messages.")
+        OutlinedButton(onClick = { providerStore.clear(); config = providerStore.load(); status = "API key cleared from this device." }, modifier = Modifier.fillMaxWidth()) { Text("Remove saved API key") }
     }
 }
 
