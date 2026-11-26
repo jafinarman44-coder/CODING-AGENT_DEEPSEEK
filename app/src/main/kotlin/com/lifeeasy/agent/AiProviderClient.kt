@@ -86,7 +86,9 @@ class OpenAiCompatibleClient(
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) throw IllegalStateException("Model list HTTP ${response.code} at $endpoint: ${body.take(350)}")
             val data = JSONObject(body).optJSONArray("data") ?: JSONArray()
-            (0 until data.length()).mapNotNull { data.optJSONObject(it)?.optString("id")?.takeIf(String::isNotBlank) }.distinct().sorted()
+            (0 until data.length()).mapNotNull { index ->
+                data.optJSONObject(index)?.optString("id")?.takeIf(String::isNotBlank)?.removePrefix("models/")
+            }.distinct().sorted()
         }
     }
 
@@ -99,7 +101,7 @@ class OpenAiCompatibleClient(
             messages.put(JSONObject().put("role", role).put("content", content))
         }
         val body = JSONObject()
-            .put("model", config.model)
+            .put("model", if (config.providerName.contains("Gemini", ignoreCase = true) && config.model == "gemini-2.0-flash") "gemini-3.8-flash" else config.model)
             .put("messages", messages)
             .put("temperature", 0.7)
             .put("stream", false)

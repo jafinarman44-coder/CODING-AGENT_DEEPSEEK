@@ -9,6 +9,8 @@ import android.net.Uri
 import android.app.Activity
 import android.os.BatteryManager
 import android.os.Build
+import android.speech.tts.TextToSpeech
+import android.speech.RecognizerIntent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -62,6 +64,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
+import java.util.Locale
 import java.io.File
 import com.lifeeasy.agent.feature.docs.model.DocumentRequest
 import com.lifeeasy.agent.feature.docs.model.DocumentTable
@@ -86,6 +89,15 @@ private enum class Destination(val title: String) {
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Keep Android system bars aligned with the app's fixed dark visual system.
+        window.statusBarColor = android.graphics.Color.rgb(5, 7, 19)
+        window.navigationBarColor = android.graphics.Color.rgb(5, 7, 19)
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = 0
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isStatusBarContrastEnforced = false
+            window.isNavigationBarContrastEnforced = false
+        }
         val db = DatabaseFactory.get(applicationContext)
         val memoryRepository = EncryptedMemoryRepository(db.encryptedMemoryDao())
         setContent {
@@ -395,7 +407,7 @@ private fun ExploreScreen(onSelect: (Destination) -> Unit) {
         WorkspaceRow(Icons.Outlined.Groups, "Meeting organizer", "Structure discussion lines and possible action items", Violet) { onSelect(Destination.CHAT) }
         WorkspaceRow(Icons.Outlined.Translate, "Translation", "Translation engine is not connected", Cyan) { onSelect(Destination.CHAT) }
         WorkspaceRow(Icons.Outlined.Description, "Document outline", "Create a structured outline from a prompt", Violet) { onSelect(Destination.CHAT) }
-        WorkspaceRow(Icons.Outlined.Mic, "Voice assistant", "Voice capture and speech output not connected", Cyan) { onSelect(Destination.VOICE) }
+        WorkspaceRow(Icons.Outlined.Mic, "Voice assistant", "Device speech recognition and no-key TTS", Cyan) { onSelect(Destination.VOICE) }
         StatusNote("Capability notice", "Web search, image generation and cloud AI require provider integrations and are not active in this offline build.")
     }
 }
@@ -527,11 +539,76 @@ private fun CreateScreen() {
 
 @Composable
 private fun VoiceScreen() {
-    Column(Modifier.fillMaxSize().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Box(Modifier.size(126.dp).clip(CircleShape).background(Brush.radialGradient(listOf(Violet.copy(.55f), Panel, Ink))).border(1.dp, Cyan.copy(.45f), CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Mic, null, tint = Color.White, modifier = Modifier.size(48.dp)) }
-        Spacer(Modifier.height(18.dp)); Text("Voice Assistant", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Bold)
-        Text("Voice capture, speech recognition and ElevenLabs output are not connected in this build.", color = Muted, fontSize = 12.sp, lineHeight = 18.sp)
-        Spacer(Modifier.height(12.dp)); StatusNote("Voice status", "Voice security/profile components exist, but no live microphone or speech provider is active.")
+    val context = LocalContext.current
+    var spokenText by remember { mutableStateOf("") }
+    var recognizedText by remember { mutableStateOf("") }
+    var voiceStatus by remember { mutableStateOf("Preparing the device's built-in voice engine…") }
+    var ttsReady by remember { mutableStateOf(false) }
+
+    val tts = remember(context) {
+        TextToSpeech(context) { result ->
+            if (result == TextToSpeech.SUCCESS) {
+                voiceStatus = "Android system speech engine initialized."
+                ttsReady = true
+            } else {
+                voiceStatus = "No Android text-to-speech engine is available on this device."
+                ttsReady = false
+            }
+        }
+    }
+    DisposableEffect(tts) {
+        onDispose { tts.stop(); tts.shutdown() }
+    }
+
+    val speechLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val matches = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+        recognizedText = matches?.firstOrNull().orEmpty()
+        if (recognizedText.isNotBlank()) {
+            spokenText = recognizedText
+            voiceStatus = "Speech recognized by the Android speech-recognition service."
+        } else {
+            voiceStatus = "No speech result returned. Check microphone permission and the installed recognition service."
+        }
+    }
+
+    Column(Modifier.fillMaxSize().padding(18.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(Modifier.size(104.dp).clip(CircleShape).background(Brush.radialGradient(listOf(Violet.copy(.55f), Panel, Ink))).border(1.dp, Cyan.copy(.45f), CircleShape), contentAlignment = Alignment.Center) {
+            Icon(Icons.Outlined.Mic, null, tint = Color.White, modifier = Modifier.size(42.dp))
+        }
+        Text("Voice Assistant", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+        Text("Automatic no-key voice mode uses the speech engine installed on this Android phone. ElevenLabs cloud voices require an ElevenLabs API key; this screen does not pretend otherwise.", color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
+        OutlinedTextField(value = spokenText, onValueChange = { spokenText = it }, label = { Text("Text to speak") }, modifier = Modifier.fillMaxWidth(), minLines = 3)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = {
+                val bn = tts.isLanguageAvailable(Locale("bn", "BD")) >= TextToSpeech.LANG_AVAILABLE
+                val selectedLocale = if (bn) Locale("bn", "BD") else Locale.US
+                val languageResult = tts.setLanguage(selectedLocale)
+                voiceStatus = if (languageResult >= TextToSpeech.LANG_AVAILABLE) {
+                    tts.speak(spokenText, TextToSpeech.QUEUE_FLUSH, null, "lifeeasy-voice-${System.currentTimeMillis()}")
+                    "Speaking with ${if (bn) "Bangla" else "the device default English"} system voice."
+                } else "The selected language voice is not installed. Install a TTS voice in Android settings."
+            }, enabled = ttsReady && spokenText.isNotBlank(), modifier = Modifier.weight(1f)) {
+                Icon(Icons.Outlined.VolumeUp, null); Spacer(Modifier.width(6.dp)); Text("Speak")
+            }
+            OutlinedButton(onClick = {
+                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, "bn-BD")
+                    putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now")
+                    putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+                }
+                runCatching { speechLauncher.launch(intent) }.onFailure {
+                    voiceStatus = "Speech recognition is unavailable: ${it.message ?: it.javaClass.simpleName}"
+                }
+            }, modifier = Modifier.weight(1f)) {
+                Icon(Icons.Outlined.Mic, null); Spacer(Modifier.width(6.dp)); Text("Listen")
+            }
+        }
+        if (recognizedText.isNotBlank()) {
+            StatusNote("Recognized speech", recognizedText)
+        }
+        StatusNote("Voice engine", voiceStatus)
+        StatusNote("Privacy and capability", "Text-to-speech runs through the Android TTS engine. Speech recognition is provided by an installed Android recognition service and may require internet, depending on the phone. No ElevenLabs API call is made in this no-key mode.")
     }
 }
 
@@ -670,7 +747,7 @@ private fun SettingsScreen(providerStore: AiProviderStore) {
         StatusNote("Free & paid models", "A model marked Free may have limited rate limits, regional restrictions, temporary availability or require a provider account. Paid models can incur charges. Check provider pricing before use.")
         StatusNote("Local Ollama", "On a physical phone, use http://YOUR-PC-LAN-IP:11434/v1, enable OLLAMA_HOST=0.0.0.0 on the PC, and allow TCP 11434 through the PC firewall. Do not use localhost on the phone.")
         StatusNote("Security", "API keys are encrypted at rest with Android Keystore AES-GCM. Never share your key or commit it to GitHub.")
-        StatusLine("Voice provider", "Not configured", false)
+        StatusLine("Voice provider", "Android system TTS · no API key required", true)
     }
 }
 

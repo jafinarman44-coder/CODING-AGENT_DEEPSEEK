@@ -17,7 +17,7 @@ object ProviderCatalog {
             ModelPreset("gpt-4o-mini", "Paid"), ModelPreset("gpt-4o", "Paid"), ModelPreset("gpt-4.1-mini", "Paid"), ModelPreset("gpt-4.1", "Paid")
         )),
         ProviderPreset("Google Gemini", "https://generativelanguage.googleapis.com/v1beta/openai", "https://aistudio.google.com/app/apikey", listOf(
-            ModelPreset("gemini-2.5-flash", "Free tier may be available"), ModelPreset("gemini-2.5-pro", "Paid / quota-based"), ModelPreset("gemini-2.0-flash", "Availability varies")
+            ModelPreset("gemini-3.8-flash", "Current Flash · check project quota"), ModelPreset("gemini-3.1-flash-lite", "Lower-cost option · availability varies"), ModelPreset("gemini-2.5-flash", "Legacy fallback · availability varies"), ModelPreset("gemini-2.5-pro", "Higher capability · quota/billing applies")
         )),
         ProviderPreset("DeepSeek", "https://api.deepseek.com", "https://platform.deepseek.com/api_keys", listOf(
             ModelPreset("deepseek-chat", "Provider pricing applies"), ModelPreset("deepseek-reasoner", "Provider pricing applies")
