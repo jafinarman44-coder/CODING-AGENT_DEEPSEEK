@@ -51,7 +51,6 @@ import com.lifeeasy.agent.feature.memory.MemoryScreen
 import com.lifeeasy.agent.feature.monitor.MonitorEventStore
 import com.google.android.filament.utils.Manipulator
 import io.github.sceneview.Scene
-import io.github.sceneview.SurfaceType
 import io.github.sceneview.math.Position
 import io.github.sceneview.node.ModelNode
 import io.github.sceneview.rememberCameraNode
@@ -356,7 +355,6 @@ private fun EarthGlobeScene(modifier: Modifier = Modifier, modelScale: Float = 1
         if (modelInstance != null && globeNodes.isNotEmpty()) {
             Scene(
                 modifier = Modifier.fillMaxSize(),
-                surfaceType = SurfaceType.TextureSurface,
                 engine = engine,
                 modelLoader = modelLoader,
                 environmentLoader = environmentLoader,
